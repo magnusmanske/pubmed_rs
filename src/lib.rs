@@ -4,11 +4,13 @@ use date;
 use reqwest;
 use serde_json;
 
-#[derive(Debug, Clone)]
+type PubMedDate = Option<date::Date>;
+/*
 pub enum PubMedDate {
     YMD(date::Date),
     None,
 }
+*/
 
 #[derive(Debug, Clone)]
 pub struct MeshTermPart {
@@ -65,8 +67,8 @@ impl Work {
     pub fn new() -> Work {
         Work {
             pmid: 0,
-            date_completed: PubMedDate::None,
-            date_revised: PubMedDate::None,
+            date_completed: None,
+            date_revised: None,
             mesh_heading_list: vec![],
         }
     }
@@ -89,7 +91,7 @@ impl Work {
             .count()
             == 0
         {
-            return PubMedDate::None;
+            return None;
         }
 
         // No day?
@@ -99,7 +101,7 @@ impl Work {
             .count()
             == 0
         {
-            return PubMedDate::YMD(date::Date::new(
+            return Some(date::Date::new(
                 Work::first_node_as_text(&node, "Year")
                     .parse::<u32>()
                     .unwrap(),
@@ -109,7 +111,7 @@ impl Work {
         }
 
         // Year, Month, Day
-        PubMedDate::YMD(date::Date::new(
+        Some(date::Date::new(
             Work::first_node_as_text(&node, "Year")
                 .parse::<u32>()
                 .unwrap(),
@@ -203,7 +205,20 @@ impl Client {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_doi() {
+        let client = super::Client::new();
+        let ids = client
+            .work_ids_from_query(&"\"10.1038/NATURE11174\"".to_string(), 1000)
+            .unwrap();
+        assert_eq!(ids, vec![22722859])
+    }
+
+    #[test]
+    fn test_work() {
+        let client = super::Client::new();
+        let work = client.work(22722859).unwrap();
+        assert_eq!(work.date_completed.unwrap().year, 2012);
+        assert_eq!(work.date_completed.unwrap().month, 8);
+        assert_eq!(work.date_completed.unwrap().day, 17);
     }
 }
