@@ -5,12 +5,6 @@ use reqwest;
 use serde_json;
 
 type PubMedDate = Option<date::Date>;
-/*
-pub enum PubMedDate {
-    YMD(date::Date),
-    None,
-}
-*/
 
 #[derive(Debug, Clone)]
 pub struct MeshTermPart {
@@ -52,6 +46,64 @@ impl MeshHeading {
             descriptor: MeshTermPart::new_from_xml(&node_descriptor),
             qualifiers: qualifiers,
         }
+    }
+}
+
+/////////
+
+#[derive(Debug, Clone)]
+pub struct ELocationID {
+    e_id_type: String,
+    valid: bool,
+    id: String,
+}
+
+impl ELocationID {
+    pub fn new_from_xml(node: &roxmltree::Node) -> ELocationID {
+        ELocationID {
+            e_id_type: node.attribute("EIdType").or(Some("")).unwrap().to_string(),
+            valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
+            id: node.text().unwrap().to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Article {
+    pub_model: String,
+    //journal:Journal,
+    title: String,
+    //pagination:Pagination,
+    e_location_ids: Vec<ELocationID>,
+    //abstract:Abstract,
+    //author_list:AuthorList,
+    language: String,
+    //grant_list:GrantList,
+    //publication_type_list:PublicationTypeList,
+    //article_date:ArticleDate,
+}
+
+impl Article {
+    pub fn new() -> Article {
+        Article {
+            pub_model: "".to_string(),
+            //journal:Journal,
+            title: "".to_string(),
+            //pagination:Pagination,
+            e_location_ids: vec![],
+            //abstract:Abstract,
+            //author_list:AuthorList,
+            language: "".to_string(),
+            //grant_list:GrantList,
+            //publication_type_list:PublicationTypeList,
+            //article_date:ArticleDate,
+        }
+    }
+
+    pub fn new_from_xml(node: &roxmltree::Node) -> Article {
+        let mut ret = Article::new();
+        ret.pub_model = node.attribute("PubModel").or(Some("")).unwrap().to_string();
+        ret
     }
 }
 
