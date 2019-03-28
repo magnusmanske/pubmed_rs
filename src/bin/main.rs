@@ -6,6 +6,6 @@ fn main() {
             .unwrap();
         let works = client.works(&ids);
     */
-    let works = client.works(&vec![19348744, 25081398]);
+    let works = client.works(&vec![22722859]); // ,19348744,25081398
     println!("{:?}", works);
 }
