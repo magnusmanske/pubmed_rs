@@ -1,0 +1,20 @@
+[package]
+name = "pubmed"
+version = "0.1.0"
+authors = ["Magnus Manske <magnusmanske@googlemail.com>"]
+edition = "2018"
+description="A wrapper around the PubMed API"
+repository="https://github.com/magnusmanske/pubmed"
+keywords=["pubmed","api","publications","papers","science"]
+categories=["api-bindings","science"]
+license="MIT"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
+
+[dependencies]
+serde_json = "1"
+reqwest = "0.9.11"
+roxmltree = "0.6.0"
+date = "0.1.3"
