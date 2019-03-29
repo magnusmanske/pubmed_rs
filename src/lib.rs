@@ -460,6 +460,7 @@ pub struct Work {
     pub medline_journal_info: Option<MedlineJournalInfo>,
     pub article: Option<Article>,
     pub other_ids: Vec<OtherID>,
+    pub citation_subsets: Vec<String>,
 }
 
 impl Work {
@@ -472,6 +473,7 @@ impl Work {
             medline_journal_info: None,
             article: None,
             other_ids: vec![],
+            citation_subsets: vec![],
         }
     }
 
@@ -486,6 +488,9 @@ impl Work {
                     source: node.attribute("Source").map(|v| v.to_string()),
                     id: node.text().map(|v| v.to_string()),
                 }),
+                "CitationSubset" => self
+                    .citation_subsets
+                    .push(node.text().map(|v| v.to_string()).unwrap()),
                 "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
                 "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
                 "Article" => self.article = Some(Article::new_from_xml(&node)),
