@@ -10,6 +10,7 @@ pub struct PubMedDate {
     pub year: u32,
     pub month: u8,
     pub day: u8,
+    pub date_type: Option<String>,
 }
 
 impl PubMedDate {
@@ -18,6 +19,7 @@ impl PubMedDate {
             year: 0,
             month: 0,
             day: 0,
+            date_type: node.attribute("DateType").map(|v| v.to_string()),
         };
 
         for n in node.children().filter(|n| n.is_element()) {
@@ -357,7 +359,7 @@ pub struct Article {
     pub language: Option<String>,
     pub grant_list: Option<GrantList>,
     pub publication_type_list: Vec<PublicationType>,
-    //article_date:ArticleDate,
+    pub article_date: Vec<PubMedDate>,
 }
 
 impl Article {
@@ -373,7 +375,7 @@ impl Article {
             language: None,
             grant_list: None,
             publication_type_list: vec![],
-            //article_date:ArticleDate,
+            article_date: vec![],
         }
     }
 
@@ -399,6 +401,7 @@ impl Article {
                 "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
+                "ArticleDate" => ret.article_date.push(PubMedDate::new_from_xml(&n).unwrap()),
                 "PublicationTypeList" => {
                     ret.publication_type_list = n
                         .children()
