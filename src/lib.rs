@@ -10,6 +10,8 @@ pub struct PubMedDate {
     pub year: u32,
     pub month: u8,
     pub day: u8,
+    pub hour: i8,
+    pub minute: i8,
     pub date_type: Option<String>,
     pub pub_status: Option<String>,
 }
@@ -20,6 +22,8 @@ impl PubMedDate {
             year: 0,
             month: 0,
             day: 0,
+            hour: -1,
+            minute: -1,
             date_type: node.attribute("DateType").map(|v| v.to_string()),
             pub_status: node.attribute("PubStatus").map(|v| v.to_string()),
         };
@@ -41,7 +45,17 @@ impl PubMedDate {
                         .text()
                         .map_or(0, |v| v.to_string().parse::<u8>().unwrap_or(0))
                 }
-                _ => {}
+                "Hour" => {
+                    ret.hour = n
+                        .text()
+                        .map_or(-1, |v| v.to_string().parse::<i8>().unwrap_or(-1))
+                }
+                "Minute" => {
+                    ret.minute = n
+                        .text()
+                        .map_or(-1, |v| v.to_string().parse::<i8>().unwrap_or(-1))
+                }
+                x => println!("Not covered in PubMedDate: '{}'", x),
             }
         }
         match ret.precision() {
@@ -50,7 +64,7 @@ impl PubMedDate {
         }
     }
 
-    // 11=day, 10=month, 9=year
+    // 13=minute, 12,hour, 11=day, 10=month, 9=year; same as Wikidata/wikibase
     pub fn precision(&self) -> u8 {
         if self.year == 0 {
             0
@@ -58,8 +72,12 @@ impl PubMedDate {
             9
         } else if self.day == 0 {
             10
-        } else {
+        } else if self.hour == -1 {
             11
+        } else if self.minute == -1 {
+            12
+        } else {
+            13
         }
     }
 }
@@ -562,10 +580,28 @@ pub struct ArticleId {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PubmedData {
     pub article_ids: Vec<ArticleId>,
+    pub history: Vec<PubMedDate>,
     pub publication_status: Option<String>,
 }
 
 impl PubmedData {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            article_ids: vec![],
+            history: vec![],
+            publication_status: None,
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "ArticleIdList" => ret.add_article_ids_from_xml(&n),
+                "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
+                "History" => ret.add_history_from_xml(&n),
+                x => println!("Not covered in PubmedData: '{}'", x), //TODO
+            }
+        }
+        ret
+    }
+
     fn add_article_ids_from_xml(&mut self, node: &roxmltree::Node) {
         for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
@@ -581,19 +617,13 @@ impl PubmedData {
         }
     }
 
-    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
-        let mut ret = Self {
-            article_ids: vec![],
-            publication_status: None,
-        };
-        for n in node.children().filter(|n| n.is_element()) {
+    fn add_history_from_xml(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
-                "ArticleIdList" => ret.add_article_ids_from_xml(&n),
-                "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in PubmedData: '{}'", x), //TODO
+                "PubMedPubDate" => self.history.push(PubMedDate::new_from_xml(&n).unwrap()),
+                x => println!("Not covered in PubmedData::add_history_from_xml: '{}'", x),
             }
         }
-        ret
     }
 }
 
