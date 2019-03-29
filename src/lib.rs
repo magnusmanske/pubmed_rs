@@ -446,6 +446,12 @@ impl MedlineJournalInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OtherID {
+    source: Option<String>,
+    id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
     pmid: u64,
     date_completed: Option<PubMedDate>,
@@ -453,6 +459,7 @@ pub struct Work {
     mesh_heading_list: Vec<MeshHeading>,
     medline_journal_info: Option<MedlineJournalInfo>,
     article: Option<Article>,
+    other_ids: Vec<OtherID>,
 }
 
 impl Work {
@@ -464,6 +471,7 @@ impl Work {
             mesh_heading_list: vec![],
             medline_journal_info: None,
             article: None,
+            other_ids: vec![],
         }
     }
 
@@ -474,6 +482,10 @@ impl Work {
                     Some(id) => self.pmid = id.parse::<u64>().unwrap(),
                     None => {}
                 },
+                "OtherID" => self.other_ids.push(OtherID {
+                    source: node.attribute("Source").map(|v| v.to_string()),
+                    id: node.text().map(|v| v.to_string()),
+                }),
                 "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
                 "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
                 "Article" => self.article = Some(Article::new_from_xml(&node)),
