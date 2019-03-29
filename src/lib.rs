@@ -62,17 +62,17 @@ impl PubMedDate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeshTermPart {
-    pub ui: String,
+    pub ui: Option<String>,
     pub major_topic: bool,
-    pub name: String,
+    pub name: Option<String>,
 }
 
 impl MeshTermPart {
     fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            ui: node.attribute("UI").or(Some("")).unwrap().to_string(),
+            ui: node.attribute("UI").map(|v| v.to_string()),
             major_topic: node.attribute("MajorTopicYN").map_or(false, |v| v == "Y"),
-            name: node.text().unwrap().to_string(),
+            name: node.text().map(|v| v.to_string()),
         }
     }
 }
@@ -108,42 +108,34 @@ impl MeshHeading {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ELocationID {
-    pub e_id_type: String,
+    pub e_id_type: Option<String>,
     pub valid: bool,
-    pub id: String,
+    pub id: Option<String>,
 }
 
 impl ELocationID {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            e_id_type: node.attribute("EIdType").or(Some("")).unwrap().to_string(),
+            e_id_type: node.attribute("EIdType").map(|v| v.to_string()),
             valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
-            id: node.text().unwrap().to_string(),
+            id: node.text().map(|v| v.to_string()),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Abstract {
-    pub text: String,
+    pub text: Option<String>,
 }
 
 impl Abstract {
-    pub fn new() -> Self {
-        Self {
-            text: "".to_string(),
-        }
-    }
-
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             text: node
                 .descendants()
                 .filter(|n| n.is_element() && n.tag_name().name() == "AbstractText")
                 .map(|n| n.text().or(Some("")).unwrap().to_string())
-                .next()
-                .or(Some("".to_string()))
-                .unwrap(),
+                .next(),
         }
     }
 }
@@ -297,14 +289,14 @@ impl Journal {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
-    pub_model: String,
+    pub_model: Option<String>,
     journal: Option<Journal>,
-    title: String,
+    title: Option<String>,
     //pagination:Pagination,
     e_location_ids: Vec<ELocationID>,
-    the_abstract: Abstract,
-    author_list: AuthorList,
-    language: String,
+    the_abstract: Option<Abstract>,
+    author_list: Option<AuthorList>,
+    language: Option<String>,
     //grant_list:GrantList,
     //publication_type_list:PublicationTypeList,
     //article_date:ArticleDate,
@@ -313,14 +305,14 @@ pub struct Article {
 impl Article {
     pub fn new() -> Self {
         Self {
-            pub_model: "".to_string(),
+            pub_model: None,
             journal: None,
-            title: "".to_string(),
+            title: None,
             //pagination:Pagination,
             e_location_ids: vec![],
-            the_abstract: Abstract::new(),
-            author_list: AuthorList::new(),
-            language: "".to_string(),
+            the_abstract: None,
+            author_list: None,
+            language: None,
             //grant_list:GrantList,
             //publication_type_list:PublicationTypeList,
             //article_date:ArticleDate,
@@ -329,17 +321,17 @@ impl Article {
 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Article::new();
-        ret.pub_model = node.attribute("PubModel").or(Some("")).unwrap().to_string();
+        ret.pub_model = node.attribute("PubModel").map(|v| v.to_string());
 
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
-                "ArticleTitle" => ret.title = n.text().or(Some("")).unwrap().to_string(),
+                "ArticleTitle" => ret.title = n.text().map(|v| v.to_string()),
                 "Journal" => ret.journal = Some(Journal::new_from_xml(&n)),
                 //"Pagination" => {}
                 "ELocationID" => ret.e_location_ids.push(ELocationID::new_from_xml(&n)),
-                "Abstract" => ret.the_abstract = Abstract::new_from_xml(&n),
-                "AuthorList" => ret.author_list = AuthorList::new_from_xml(&n),
-                "Language" => ret.language = n.text().or(Some("")).unwrap().to_string(),
+                "Abstract" => ret.the_abstract = Some(Abstract::new_from_xml(&n)),
+                "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
+                "Language" => ret.language = n.text().map(|v| v.to_string()),
                 //"GrantList" => {}
                 //"PublicationTypeList" => {}
                 //"ArticleDate" => {}
@@ -359,7 +351,7 @@ pub struct Work {
     date_completed: Option<PubMedDate>,
     date_revised: Option<PubMedDate>,
     mesh_heading_list: Vec<MeshHeading>,
-    article: Article,
+    article: Option<Article>,
 }
 
 impl Work {
@@ -369,18 +361,8 @@ impl Work {
             date_completed: None,
             date_revised: None,
             mesh_heading_list: vec![],
-            article: Article::new(),
+            article: None,
         }
-    }
-
-    fn _first_node_as_text(node: &roxmltree::Node, tag_name: &str) -> String {
-        node.descendants()
-            .filter(|n| n.is_element() && n.tag_name().name() == tag_name)
-            .next()
-            .unwrap()
-            .text()
-            .unwrap()
-            .to_string()
     }
 
     fn import_medline_citation_from_xml(&mut self, root: &roxmltree::Node) {
@@ -392,7 +374,7 @@ impl Work {
                 },
                 "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
                 "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
-                "Article" => self.article = Article::new_from_xml(&node),
+                "Article" => self.article = Some(Article::new_from_xml(&node)),
                 "MeshHeadingList" => {
                     self.mesh_heading_list = node
                         .descendants()
@@ -408,8 +390,7 @@ impl Work {
     fn import_pubmed_data_from_xml(&mut self, root: &roxmltree::Node) {
         for node in root.descendants().filter(|n| n.is_element()) {
             match node.tag_name().name() {
-                    _ => {}
-                    //x => println!("Not covered in MedlineCitation: '{}'", x),
+                x => println!("Not covered in PubmedData: '{}'", x),
             }
         }
     }
