@@ -1,3 +1,5 @@
+use serde_json;
+
 fn main() {
     let client = pubmed::Client::new();
     /*
@@ -6,6 +8,6 @@ fn main() {
             .unwrap();
         let works = client.works(&ids);
     */
-    let works = client.works(&vec![22722859]); // ,19348744,25081398
-    println!("{:?}", works);
+    let works = client.works(&vec![22722859]).unwrap(); // ,19348744,25081398
+    println!("{}", serde_json::to_string(&works[0]).unwrap());
 }

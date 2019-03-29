@@ -1,12 +1,64 @@
 extern crate roxmltree;
 
-use date;
 use reqwest;
 //use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-type PubMedDate = Option<date::Date>; // TODO: (de)serialize
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PubMedDate {
+    pub year: u32,
+    pub month: u8,
+    pub day: u8,
+}
+
+impl PubMedDate {
+    fn new_from_xml(node: &roxmltree::Node) -> Option<PubMedDate> {
+        let mut ret = Self {
+            year: 0,
+            month: 0,
+            day: 0,
+        };
+
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Year" => {
+                    ret.year = n
+                        .text()
+                        .map_or(0, |v| v.to_string().parse::<u32>().unwrap_or(0))
+                }
+                "Month" => {
+                    ret.month = n
+                        .text()
+                        .map_or(0, |v| v.to_string().parse::<u8>().unwrap_or(0))
+                }
+                "Day" => {
+                    ret.day = n
+                        .text()
+                        .map_or(0, |v| v.to_string().parse::<u8>().unwrap_or(0))
+                }
+                _ => {}
+            }
+        }
+        match ret.precision() {
+            0 => None,
+            _ => Some(ret),
+        }
+    }
+
+    // 11=day, 10=month, 9=year
+    pub fn precision(&self) -> u8 {
+        if self.year == 0 {
+            0
+        } else if self.month == 0 {
+            9
+        } else if self.day == 0 {
+            10
+        } else {
+            11
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeshTermPart {
@@ -104,12 +156,10 @@ pub struct AffiliationInfo {
 impl AffiliationInfo {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self { affiliation: None };
-        for n in node.children() {
-            if n.is_element() {
-                match n.tag_name().name() {
-                    "Affiliation" => ret.affiliation = n.text().map(|v| v.to_string()),
-                    x => println!("Not covered in AffiliationInfo: '{}'", x),
-                }
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Affiliation" => ret.affiliation = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in AffiliationInfo: '{}'", x),
             }
         }
         ret
@@ -134,18 +184,14 @@ impl Author {
             affiliation_info: None,
             valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
         };
-        for n in node.children() {
-            if n.is_element() {
-                match n.tag_name().name() {
-                    "LastName" => ret.last_name = n.text().map(|v| v.to_string()),
-                    "ForeName" => ret.fore_name = n.text().map(|v| v.to_string()),
-                    "Initials" => ret.initials = n.text().map(|v| v.to_string()),
-                    "AffiliationInfo" => {
-                        ret.affiliation_info = Some(AffiliationInfo::new_from_xml(&n))
-                    }
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "LastName" => ret.last_name = n.text().map(|v| v.to_string()),
+                "ForeName" => ret.fore_name = n.text().map(|v| v.to_string()),
+                "Initials" => ret.initials = n.text().map(|v| v.to_string()),
+                "AffiliationInfo" => ret.affiliation_info = Some(AffiliationInfo::new_from_xml(&n)),
 
-                    x => println!("Not covered in Author: '{}'", x),
-                }
+                x => println!("Not covered in Author: '{}'", x),
             }
         }
         ret
@@ -179,9 +225,80 @@ impl AuthorList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JournalIssue {
+    cited_medium: Option<String>,
+    volume: Option<String>,
+    issue: Option<String>,
+    pub_date: Option<PubMedDate>,
+}
+
+impl JournalIssue {
+    pub fn new() -> Self {
+        Self {
+            cited_medium: None,
+            volume: None,
+            issue: None,
+            pub_date: None,
+        }
+    }
+
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self::new();
+        ret.cited_medium = node.attribute("CitedMedium").map(|v| v.to_string());
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "PubDate" => ret.pub_date = PubMedDate::new_from_xml(&n),
+                "Volume" => ret.volume = n.text().map(|v| v.to_string()),
+                "Issue" => ret.issue = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in JournalIssue: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Journal {
+    issn: Option<String>,
+    issn_type: Option<String>,
+    journal_issue: Option<JournalIssue>,
+    title: Option<String>,
+    iso_abbreviation: Option<String>,
+}
+
+impl Journal {
+    pub fn new() -> Self {
+        Self {
+            issn: None,
+            issn_type: None,
+            journal_issue: None,
+            title: None,
+            iso_abbreviation: None,
+        }
+    }
+
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self::new();
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "ISSN" => {
+                    ret.issn = n.text().map(|v| v.to_string());
+                    ret.issn_type = n.attribute("IssnType").map(|v| v.to_string());
+                }
+                "JournalIssue" => ret.journal_issue = Some(JournalIssue::new_from_xml(&n)),
+                "Title" => ret.title = n.text().map(|v| v.to_string()),
+                "ISOAbbreviation" => ret.iso_abbreviation = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in Journal: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
     pub_model: String,
-    //journal:Journal,
+    journal: Option<Journal>,
     title: String,
     //pagination:Pagination,
     e_location_ids: Vec<ELocationID>,
@@ -197,7 +314,7 @@ impl Article {
     pub fn new() -> Self {
         Self {
             pub_model: "".to_string(),
-            //journal:Journal,
+            journal: None,
             title: "".to_string(),
             //pagination:Pagination,
             e_location_ids: vec![],
@@ -214,21 +331,19 @@ impl Article {
         let mut ret = Article::new();
         ret.pub_model = node.attribute("PubModel").or(Some("")).unwrap().to_string();
 
-        for n in node.children() {
-            if n.is_element() {
-                match n.tag_name().name() {
-                    "ArticleTitle" => ret.title = n.text().or(Some("")).unwrap().to_string(),
-                    //"Journal" => {}
-                    //"Pagination" => {}
-                    "ELocationID" => ret.e_location_ids.push(ELocationID::new_from_xml(&n)),
-                    "Abstract" => ret.the_abstract = Abstract::new_from_xml(&n),
-                    "AuthorList" => ret.author_list = AuthorList::new_from_xml(&n),
-                    "Language" => ret.language = n.text().or(Some("")).unwrap().to_string(),
-                    //"GrantList" => {}
-                    //"PublicationTypeList" => {}
-                    //"ArticleDate" => {}
-                    x => println!("Not covered in Article: '{}'", x),
-                }
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "ArticleTitle" => ret.title = n.text().or(Some("")).unwrap().to_string(),
+                "Journal" => ret.journal = Some(Journal::new_from_xml(&n)),
+                //"Pagination" => {}
+                "ELocationID" => ret.e_location_ids.push(ELocationID::new_from_xml(&n)),
+                "Abstract" => ret.the_abstract = Abstract::new_from_xml(&n),
+                "AuthorList" => ret.author_list = AuthorList::new_from_xml(&n),
+                "Language" => ret.language = n.text().or(Some("")).unwrap().to_string(),
+                //"GrantList" => {}
+                //"PublicationTypeList" => {}
+                //"ArticleDate" => {}
+                x => println!("Not covered in Article: '{}'", x),
             }
         }
 
@@ -238,11 +353,11 @@ impl Article {
 
 //____________________________________________________________________________________________________
 
-#[derive(Debug, Clone)] // , Serialize, Deserialize
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
     pmid: u64,
-    date_completed: PubMedDate,
-    date_revised: PubMedDate,
+    date_completed: Option<PubMedDate>,
+    date_revised: Option<PubMedDate>,
     mesh_heading_list: Vec<MeshHeading>,
     article: Article,
 }
@@ -258,7 +373,7 @@ impl Work {
         }
     }
 
-    fn first_node_as_text(node: &roxmltree::Node, tag_name: &str) -> String {
+    fn _first_node_as_text(node: &roxmltree::Node, tag_name: &str) -> String {
         node.descendants()
             .filter(|n| n.is_element() && n.tag_name().name() == tag_name)
             .next()
@@ -268,91 +383,44 @@ impl Work {
             .to_string()
     }
 
-    fn date_from_xml(node: &roxmltree::Node) -> PubMedDate {
-        // No year?
-        if node
-            .children()
-            .filter(|n| n.is_element() && n.tag_name().name() == "Year")
-            .count()
-            == 0
-        {
-            return None;
-        }
-
-        // No day?
-        if node
-            .children()
-            .filter(|n| n.is_element() && n.tag_name().name() == "Day")
-            .count()
-            == 0
-        {
-            return Some(date::Date::new(
-                Work::first_node_as_text(&node, "Year")
-                    .parse::<u32>()
-                    .unwrap(),
-                0,
-                0,
-            ));
-        }
-
-        // Year, Month, Day
-        Some(date::Date::new(
-            Work::first_node_as_text(&node, "Year")
-                .parse::<u32>()
-                .unwrap(),
-            Work::first_node_as_text(&node, "Month")
-                .parse::<u8>()
-                .unwrap(),
-            Work::first_node_as_text(&node, "Day")
-                .parse::<u8>()
-                .unwrap(),
-        ))
-    }
-
     fn import_medline_citation_from_xml(&mut self, root: &roxmltree::Node) {
-        for node in root.children() {
-            if node.is_element() {
-                match node.tag_name().name() {
-                    "PMID" => match node.text() {
-                        Some(id) => self.pmid = id.parse::<u64>().unwrap(),
-                        None => {}
-                    },
-                    "DateCompleted" => self.date_completed = Self::date_from_xml(&node),
-                    "DateRevised" => self.date_revised = Self::date_from_xml(&node),
-                    "Article" => self.article = Article::new_from_xml(&node),
-                    "MeshHeadingList" => {
-                        self.mesh_heading_list = node
-                            .descendants()
-                            .filter(|n| n.is_element() && n.tag_name().name() == "MeshHeading")
-                            .map(|n| MeshHeading::new_from_xml(&n))
-                            .collect()
-                    }
-                    x => println!("Not covered in MedlineCitation: '{}'", x),
+        for node in root.children().filter(|n| n.is_element()) {
+            match node.tag_name().name() {
+                "PMID" => match node.text() {
+                    Some(id) => self.pmid = id.parse::<u64>().unwrap(),
+                    None => {}
+                },
+                "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
+                "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
+                "Article" => self.article = Article::new_from_xml(&node),
+                "MeshHeadingList" => {
+                    self.mesh_heading_list = node
+                        .descendants()
+                        .filter(|n| n.is_element() && n.tag_name().name() == "MeshHeading")
+                        .map(|n| MeshHeading::new_from_xml(&n))
+                        .collect()
                 }
+                x => println!("Not covered in MedlineCitation: '{}'", x),
             }
         }
     }
 
     fn import_pubmed_data_from_xml(&mut self, root: &roxmltree::Node) {
-        for node in root.descendants() {
-            if node.is_element() {
-                match node.tag_name().name() {
-                	_ => {}
-        			//x => println!("Not covered in MedlineCitation: '{}'", x),
-                }
+        for node in root.descendants().filter(|n| n.is_element()) {
+            match node.tag_name().name() {
+                    _ => {}
+                    //x => println!("Not covered in MedlineCitation: '{}'", x),
             }
         }
     }
 
     pub fn new_from_xml(root: &roxmltree::Node) -> Self {
         let mut ret = Work::new();
-        for node in root.children() {
-            if node.is_element() {
-                match node.tag_name().name() {
-                    "MedlineCitation" => ret.import_medline_citation_from_xml(&node),
-                    "PubmedData" => ret.import_pubmed_data_from_xml(&node),
-                    x => println!("Not covered in Work: '{}'", x),
-                }
+        for node in root.children().filter(|n| n.is_element()) {
+            match node.tag_name().name() {
+                "MedlineCitation" => ret.import_medline_citation_from_xml(&node),
+                "PubmedData" => ret.import_pubmed_data_from_xml(&node),
+                x => println!("Not covered in Work: '{}'", x),
             }
         }
         ret
@@ -426,8 +494,9 @@ mod tests {
     fn test_work() {
         let client = super::Client::new();
         let work = client.work(22722859).unwrap();
-        assert_eq!(work.date_completed.unwrap().year, 2012);
-        assert_eq!(work.date_completed.unwrap().month, 8);
-        assert_eq!(work.date_completed.unwrap().day, 17);
+        let date = work.date_completed.unwrap().clone();
+        assert_eq!(date.year, 2012);
+        assert_eq!(date.month, 8);
+        assert_eq!(date.day, 17);
     }
 }
