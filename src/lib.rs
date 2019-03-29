@@ -30,6 +30,7 @@ impl PubMedDate {
 
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
+                "MedlineDate" => {} // TODO
                 "Year" => {
                     ret.year = n
                         .text()
@@ -254,7 +255,9 @@ impl JournalIssue {
         ret.cited_medium = node.attribute("CitedMedium").map(|v| v.to_string());
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
-                "PubDate" => ret.pub_date = PubMedDate::new_from_xml(&n),
+                "PubDate" => {
+                    ret.pub_date = PubMedDate::new_from_xml(&n);
+                }
                 "Volume" => ret.volume = n.text().map(|v| v.to_string()),
                 "Issue" => ret.issue = n.text().map(|v| v.to_string()),
                 x => println!("Not covered in JournalIssue: '{}'", x),
@@ -578,22 +581,69 @@ pub struct ArticleId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArticleIdList {
+    pub ids: Vec<ArticleId>,
+}
+
+impl ArticleIdList {
+    fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self { ids: vec![] };
+        for n in node.children().filter(|v| v.is_element()) {
+            match n.tag_name().name() {
+                "ArticleId" => ret.ids.push(ArticleId {
+                    id_type: n.attribute("IdType").map(|v| v.to_string()),
+                    id: n.text().map(|v| v.to_string()),
+                }),
+                x => println!("Not covered in ArticleIdList: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reference {
+    pub citation: Option<String>,
+    pub article_ids: Option<ArticleIdList>,
+}
+
+impl Reference {
+    fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            citation: None,
+            article_ids: None,
+        };
+        for n in node.children().filter(|v| v.is_element()) {
+            match n.tag_name().name() {
+                "Citation" => ret.citation = n.text().map(|v| v.to_string()),
+                "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
+                x => println!("Not covered in Reference: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PubmedData {
-    pub article_ids: Vec<ArticleId>,
+    pub article_ids: Option<ArticleIdList>,
     pub history: Vec<PubMedDate>,
+    pub references: Vec<Reference>,
     pub publication_status: Option<String>,
 }
 
 impl PubmedData {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
-            article_ids: vec![],
+            article_ids: None,
             history: vec![],
+            references: vec![],
             publication_status: None,
         };
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
-                "ArticleIdList" => ret.add_article_ids_from_xml(&n),
+                "ReferenceList" => ret.add_references_from_xml(&n),
+                "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
                 "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
                 "History" => ret.add_history_from_xml(&n),
                 x => println!("Not covered in PubmedData: '{}'", x), //TODO
@@ -602,26 +652,23 @@ impl PubmedData {
         ret
     }
 
-    fn add_article_ids_from_xml(&mut self, node: &roxmltree::Node) {
-        for n in node.children().filter(|v| v.is_element()) {
-            match n.tag_name().name() {
-                "ArticleId" => self.article_ids.push(ArticleId {
-                    id_type: n.attribute("IdType").map(|v| v.to_string()),
-                    id: n.text().map(|v| v.to_string()),
-                }),
-                x => println!(
-                    "Not covered in PubmedData::add_article_ids_from_xml: '{}'",
-                    x
-                ),
-            }
-        }
-    }
-
     fn add_history_from_xml(&mut self, node: &roxmltree::Node) {
         for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
                 "PubMedPubDate" => self.history.push(PubMedDate::new_from_xml(&n).unwrap()),
                 x => println!("Not covered in PubmedData::add_history_from_xml: '{}'", x),
+            }
+        }
+    }
+
+    fn add_references_from_xml(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|v| v.is_element()) {
+            match n.tag_name().name() {
+                "Reference" => self.references.push(Reference::new_from_xml(&n)),
+                x => println!(
+                    "Not covered in PubmedData::add_references_from_xml: '{}'",
+                    x
+                ),
             }
         }
     }
