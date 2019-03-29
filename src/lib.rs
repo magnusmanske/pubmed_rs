@@ -11,6 +11,7 @@ pub struct PubMedDate {
     pub month: u8,
     pub day: u8,
     pub date_type: Option<String>,
+    pub pub_status: Option<String>,
 }
 
 impl PubMedDate {
@@ -20,6 +21,7 @@ impl PubMedDate {
             month: 0,
             day: 0,
             date_type: node.attribute("DateType").map(|v| v.to_string()),
+            pub_status: node.attribute("PubStatus").map(|v| v.to_string()),
         };
 
         for n in node.children().filter(|n| n.is_element()) {
@@ -488,7 +490,7 @@ impl KeywordList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Work {
+pub struct MedlineCitation {
     pub pmid: u64,
     pub date_completed: Option<PubMedDate>,
     pub date_revised: Option<PubMedDate>,
@@ -500,7 +502,7 @@ pub struct Work {
     pub keyword_lists: Vec<KeywordList>,
 }
 
-impl Work {
+impl MedlineCitation {
     pub fn new() -> Self {
         Self {
             pmid: 0,
@@ -515,29 +517,30 @@ impl Work {
         }
     }
 
-    fn import_medline_citation_from_xml(&mut self, root: &roxmltree::Node) {
-        for node in root.children().filter(|n| n.is_element()) {
-            match node.tag_name().name() {
-                "PMID" => match node.text() {
-                    Some(id) => self.pmid = id.parse::<u64>().unwrap(),
+    fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self::new();
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "PMID" => match n.text() {
+                    Some(id) => ret.pmid = id.parse::<u64>().unwrap(),
                     None => {}
                 },
-                "KeywordList" => self.keyword_lists.push(KeywordList::new_from_xml(&node)),
-                "OtherID" => self.other_ids.push(OtherID {
-                    source: node.attribute("Source").map(|v| v.to_string()),
-                    id: node.text().map(|v| v.to_string()),
+                "KeywordList" => ret.keyword_lists.push(KeywordList::new_from_xml(&n)),
+                "OtherID" => ret.other_ids.push(OtherID {
+                    source: n.attribute("Source").map(|v| v.to_string()),
+                    id: n.text().map(|v| v.to_string()),
                 }),
-                "CitationSubset" => self
+                "CitationSubset" => ret
                     .citation_subsets
-                    .push(node.text().map(|v| v.to_string()).unwrap()),
-                "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
-                "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
-                "Article" => self.article = Some(Article::new_from_xml(&node)),
+                    .push(n.text().map(|v| v.to_string()).unwrap()),
+                "DateCompleted" => ret.date_completed = PubMedDate::new_from_xml(&n),
+                "DateRevised" => ret.date_revised = PubMedDate::new_from_xml(&n),
+                "Article" => ret.article = Some(Article::new_from_xml(&n)),
                 "MedlineJournalInfo" => {
-                    self.medline_journal_info = Some(MedlineJournalInfo::new_from_xml(&node))
+                    ret.medline_journal_info = Some(MedlineJournalInfo::new_from_xml(&n))
                 }
                 "MeshHeadingList" => {
-                    self.mesh_heading_list = node
+                    ret.mesh_heading_list = n
                         .descendants()
                         .filter(|n| n.is_element() && n.tag_name().name() == "MeshHeading")
                         .map(|n| MeshHeading::new_from_xml(&n))
@@ -546,23 +549,73 @@ impl Work {
                 x => println!("Not covered in MedlineCitation: '{}'", x),
             }
         }
+        ret
     }
+}
 
-    fn import_pubmed_data_from_xml(&mut self, root: &roxmltree::Node) {
-        for node in root.descendants().filter(|n| n.is_element()) {
-            match node.tag_name().name() {
-                x => println!("Not covered in PubmedData: '{}'", x), //TODO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArticleId {
+    pub id_type: Option<String>,
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PubmedData {
+    pub article_ids: Vec<ArticleId>,
+    pub publication_status: Option<String>,
+}
+
+impl PubmedData {
+    fn add_article_ids_from_xml(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|v| v.is_element()) {
+            match n.tag_name().name() {
+                "ArticleId" => self.article_ids.push(ArticleId {
+                    id_type: n.attribute("IdType").map(|v| v.to_string()),
+                    id: n.text().map(|v| v.to_string()),
+                }),
+                x => println!(
+                    "Not covered in PubmedData::add_article_ids_from_xml: '{}'",
+                    x
+                ),
             }
         }
     }
 
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            article_ids: vec![],
+            publication_status: None,
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "ArticleIdList" => ret.add_article_ids_from_xml(&n),
+                "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in PubmedData: '{}'", x), //TODO
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PubmedArticle {
+    pub medline_citation: Option<MedlineCitation>,
+    pub pubmed_data: Option<PubmedData>,
+}
+
+impl PubmedArticle {
     pub fn new_from_xml(root: &roxmltree::Node) -> Self {
-        let mut ret = Work::new();
+        let mut ret = Self {
+            medline_citation: None,
+            pubmed_data: None,
+        };
         for node in root.children().filter(|n| n.is_element()) {
             match node.tag_name().name() {
-                "MedlineCitation" => ret.import_medline_citation_from_xml(&node),
-                "PubmedData" => ret.import_pubmed_data_from_xml(&node),
-                x => println!("Not covered in Work: '{}'", x),
+                "MedlineCitation" => {
+                    ret.medline_citation = Some(MedlineCitation::new_from_xml(&node))
+                }
+                "PubmedData" => ret.pubmed_data = Some(PubmedData::new_from_xml(&node)),
+                x => println!("Not covered in PubmedArticle: '{}'", x),
             }
         }
         ret
@@ -577,7 +630,7 @@ impl Client {
         Client {}
     }
 
-    pub fn work_ids_from_query(
+    pub fn article_ids_from_query(
         &self,
         query: &String,
         max: u64,
@@ -597,7 +650,7 @@ impl Client {
         }
     }
 
-    pub fn works(&self, ids: &Vec<u64>) -> Result<Vec<Work>, Box<::std::error::Error>> {
+    pub fn articles(&self, ids: &Vec<u64>) -> Result<Vec<PubmedArticle>, Box<::std::error::Error>> {
         let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
         let url =
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id="
@@ -609,14 +662,17 @@ impl Client {
             .root()
             .descendants()
             .filter(|n| n.is_element() && n.tag_name().name() == "PubmedArticle")
-            .map(|n| Work::new_from_xml(&n))
+            .map(|n| PubmedArticle::new_from_xml(&n))
             .collect())
     }
 
-    pub fn work(&self, id: u64) -> Result<Work, Box<::std::error::Error>> {
-        match self.works(&vec![id])?.pop() {
-            Some(work) => Ok(work),
-            None => Err(From::from(format!("Can't find work for ID '{}'", id))),
+    pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<::std::error::Error>> {
+        match self.articles(&vec![id])?.pop() {
+            Some(pubmed_article) => Ok(pubmed_article),
+            None => Err(From::from(format!(
+                "Can't find PubmedArticle for ID '{}'",
+                id
+            ))),
         }
     }
 }
@@ -627,7 +683,7 @@ mod tests {
     fn test_doi() {
         let client = super::Client::new();
         let ids = client
-            .work_ids_from_query(&"\"10.1038/NATURE11174\"".to_string(), 1000)
+            .article_ids_from_query(&"\"10.1038/NATURE11174\"".to_string(), 1000)
             .unwrap();
         assert_eq!(ids, vec![22722859])
     }
@@ -635,8 +691,13 @@ mod tests {
     #[test]
     fn test_work() {
         let client = super::Client::new();
-        let work = client.work(22722859).unwrap();
-        let date = work.date_completed.unwrap().clone();
+        let article = client.article(22722859).unwrap();
+        let date = article
+            .medline_citation
+            .unwrap()
+            .date_completed
+            .unwrap()
+            .clone();
         assert_eq!(date.year, 2012);
         assert_eq!(date.month, 8);
         assert_eq!(date.day, 17);
