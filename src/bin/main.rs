@@ -8,6 +8,6 @@ fn main() {
             .unwrap();
         let works = client.works(&ids);
     */
-    let works = client.works(&vec![22722859]).unwrap(); // 22722859,19348744,25081398
+    let works = client.works(&vec![25081398]).unwrap(); // 22722859,19348744,25081398
     println!("{}", serde_json::to_string(&works[0]).unwrap());
 }
