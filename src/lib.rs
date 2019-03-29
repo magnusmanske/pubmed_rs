@@ -160,11 +160,11 @@ impl AffiliationInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Author {
-    last_name: Option<String>,
-    fore_name: Option<String>,
-    initials: Option<String>,
-    affiliation_info: Option<AffiliationInfo>,
-    valid: bool,
+    pub last_name: Option<String>,
+    pub fore_name: Option<String>,
+    pub initials: Option<String>,
+    pub affiliation_info: Option<AffiliationInfo>,
+    pub valid: bool,
 }
 
 impl Author {
@@ -192,8 +192,8 @@ impl Author {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorList {
-    authors: Vec<Author>,
-    complete: bool,
+    pub authors: Vec<Author>,
+    pub complete: bool,
 }
 
 impl AuthorList {
@@ -211,10 +211,10 @@ impl AuthorList {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JournalIssue {
-    cited_medium: Option<String>,
-    volume: Option<String>,
-    issue: Option<String>,
-    pub_date: Option<PubMedDate>,
+    pub cited_medium: Option<String>,
+    pub volume: Option<String>,
+    pub issue: Option<String>,
+    pub pub_date: Option<PubMedDate>,
 }
 
 impl JournalIssue {
@@ -244,11 +244,11 @@ impl JournalIssue {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Journal {
-    issn: Option<String>,
-    issn_type: Option<String>,
-    journal_issue: Option<JournalIssue>,
-    title: Option<String>,
-    iso_abbreviation: Option<String>,
+    pub issn: Option<String>,
+    pub issn_type: Option<String>,
+    pub journal_issue: Option<JournalIssue>,
+    pub title: Option<String>,
+    pub iso_abbreviation: Option<String>,
 }
 
 impl Journal {
@@ -281,15 +281,15 @@ impl Journal {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-enum Pagination {
+pub enum Pagination {
     MedlinePgn(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Grant {
-    grant_id: Option<String>,
-    agency: Option<String>,
-    country: Option<String>,
+    pub grant_id: Option<String>,
+    pub agency: Option<String>,
+    pub country: Option<String>,
 }
 
 impl Grant {
@@ -313,8 +313,8 @@ impl Grant {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrantList {
-    grants: Vec<Grant>,
-    complete: bool,
+    pub grants: Vec<Grant>,
+    pub complete: bool,
 }
 
 impl GrantList {
@@ -332,8 +332,8 @@ impl GrantList {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicationType {
-    ui: Option<String>,
-    name: Option<String>,
+    pub ui: Option<String>,
+    pub name: Option<String>,
 }
 
 impl PublicationType {
@@ -347,16 +347,16 @@ impl PublicationType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
-    pub_model: Option<String>,
-    journal: Option<Journal>,
-    title: Option<String>,
-    pagination: Vec<Pagination>,
-    e_location_ids: Vec<ELocationID>,
-    the_abstract: Option<Abstract>,
-    author_list: Option<AuthorList>,
-    language: Option<String>,
-    grant_list: Option<GrantList>,
-    publication_type_list: Vec<PublicationType>,
+    pub pub_model: Option<String>,
+    pub journal: Option<Journal>,
+    pub title: Option<String>,
+    pub pagination: Vec<Pagination>,
+    pub e_location_ids: Vec<ELocationID>,
+    pub the_abstract: Option<Abstract>,
+    pub author_list: Option<AuthorList>,
+    pub language: Option<String>,
+    pub grant_list: Option<GrantList>,
+    pub publication_type_list: Vec<PublicationType>,
     //article_date:ArticleDate,
 }
 
@@ -418,10 +418,10 @@ impl Article {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MedlineJournalInfo {
-    country: Option<String>,
-    medline_ta: Option<String>,
-    nlm_unique_id: Option<String>,
-    issn_linking: Option<String>,
+    pub country: Option<String>,
+    pub medline_ta: Option<String>,
+    pub nlm_unique_id: Option<String>,
+    pub issn_linking: Option<String>,
 }
 
 impl MedlineJournalInfo {
@@ -447,19 +447,19 @@ impl MedlineJournalInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OtherID {
-    source: Option<String>,
-    id: Option<String>,
+    pub source: Option<String>,
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
-    pmid: u64,
-    date_completed: Option<PubMedDate>,
-    date_revised: Option<PubMedDate>,
-    mesh_heading_list: Vec<MeshHeading>,
-    medline_journal_info: Option<MedlineJournalInfo>,
-    article: Option<Article>,
-    other_ids: Vec<OtherID>,
+    pub pmid: u64,
+    pub date_completed: Option<PubMedDate>,
+    pub date_revised: Option<PubMedDate>,
+    pub mesh_heading_list: Vec<MeshHeading>,
+    pub medline_journal_info: Option<MedlineJournalInfo>,
+    pub article: Option<Article>,
+    pub other_ids: Vec<OtherID>,
 }
 
 impl Work {
