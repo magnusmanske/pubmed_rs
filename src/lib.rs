@@ -197,13 +197,6 @@ pub struct AuthorList {
 }
 
 impl AuthorList {
-    pub fn new() -> Self {
-        Self {
-            authors: vec![],
-            complete: false,
-        }
-    }
-
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             complete: node.attribute("CompleteYN").map_or(false, |v| v == "Y"),
@@ -288,16 +281,66 @@ impl Journal {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+enum Pagination {
+    MedlinePgn(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Grant {
+    grant_id: Option<String>,
+    agency: Option<String>,
+    country: Option<String>,
+}
+
+impl Grant {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            grant_id: None,
+            agency: None,
+            country: None,
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "GrantID" => ret.grant_id = n.text().map(|v| v.to_string()),
+                "Agency" => ret.agency = n.text().map(|v| v.to_string()),
+                "Country" => ret.country = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in Grant: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrantList {
+    grants: Vec<Grant>,
+    complete: bool,
+}
+
+impl GrantList {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        Self {
+            complete: node.attribute("CompleteYN").map_or(false, |v| v == "Y"),
+            grants: node
+                .descendants()
+                .filter(|n| n.is_element() && n.tag_name().name() == "Grant")
+                .map(|n| Grant::new_from_xml(&n))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
     pub_model: Option<String>,
     journal: Option<Journal>,
     title: Option<String>,
-    //pagination:Pagination,
+    pagination: Vec<Pagination>,
     e_location_ids: Vec<ELocationID>,
     the_abstract: Option<Abstract>,
     author_list: Option<AuthorList>,
     language: Option<String>,
-    //grant_list:GrantList,
+    grant_list: Option<GrantList>,
     //publication_type_list:PublicationTypeList,
     //article_date:ArticleDate,
 }
@@ -308,12 +351,12 @@ impl Article {
             pub_model: None,
             journal: None,
             title: None,
-            //pagination:Pagination,
+            pagination: vec![],
             e_location_ids: vec![],
             the_abstract: None,
             author_list: None,
             language: None,
-            //grant_list:GrantList,
+            grant_list: None,
             //publication_type_list:PublicationTypeList,
             //article_date:ArticleDate,
         }
@@ -322,23 +365,30 @@ impl Article {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Article::new();
         ret.pub_model = node.attribute("PubModel").map(|v| v.to_string());
-
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "ArticleTitle" => ret.title = n.text().map(|v| v.to_string()),
                 "Journal" => ret.journal = Some(Journal::new_from_xml(&n)),
-                //"Pagination" => {}
+                "Pagination" => {
+                    for n2 in n.children().filter(|n| n.is_element()) {
+                        match n2.tag_name().name() {
+                            "MedlinePgn" => ret.pagination.push(Pagination::MedlinePgn(
+                                n2.text().or(Some("")).unwrap().to_string(),
+                            )),
+                            x => println!("Not covered in Pagination: '{}'", x),
+                        }
+                    }
+                }
                 "ELocationID" => ret.e_location_ids.push(ELocationID::new_from_xml(&n)),
                 "Abstract" => ret.the_abstract = Some(Abstract::new_from_xml(&n)),
                 "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
-                //"GrantList" => {}
+                "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
                 //"PublicationTypeList" => {}
                 //"ArticleDate" => {}
                 x => println!("Not covered in Article: '{}'", x),
             }
         }
-
         ret
     }
 }
@@ -390,7 +440,7 @@ impl Work {
     fn import_pubmed_data_from_xml(&mut self, root: &roxmltree::Node) {
         for node in root.descendants().filter(|n| n.is_element()) {
             match node.tag_name().name() {
-                x => println!("Not covered in PubmedData: '{}'", x),
+                _x => {} //println!("Not covered in PubmedData: '{}'", x),//TODO
             }
         }
     }
