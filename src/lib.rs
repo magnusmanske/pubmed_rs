@@ -331,6 +331,21 @@ impl GrantList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublicationType {
+    ui: Option<String>,
+    name: Option<String>,
+}
+
+impl PublicationType {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        Self {
+            ui: node.attribute("UI").map(|v| v.to_string()),
+            name: node.text().map(|v| v.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
     pub_model: Option<String>,
     journal: Option<Journal>,
@@ -341,7 +356,7 @@ pub struct Article {
     author_list: Option<AuthorList>,
     language: Option<String>,
     grant_list: Option<GrantList>,
-    //publication_type_list:PublicationTypeList,
+    publication_type_list: Vec<PublicationType>,
     //article_date:ArticleDate,
 }
 
@@ -357,7 +372,7 @@ impl Article {
             author_list: None,
             language: None,
             grant_list: None,
-            //publication_type_list:PublicationTypeList,
+            publication_type_list: vec![],
             //article_date:ArticleDate,
         }
     }
@@ -384,7 +399,13 @@ impl Article {
                 "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
-                //"PublicationTypeList" => {}
+                "PublicationTypeList" => {
+                    ret.publication_type_list = n
+                        .children()
+                        .filter(|n| n.is_element() && n.tag_name().name() == "PublicationType")
+                        .map(|n| PublicationType::new_from_xml(&n))
+                        .collect()
+                }
                 //"ArticleDate" => {}
                 x => println!("Not covered in Article: '{}'", x),
             }
@@ -396,11 +417,41 @@ impl Article {
 //____________________________________________________________________________________________________
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MedlineJournalInfo {
+    country: Option<String>,
+    medline_ta: Option<String>,
+    nlm_unique_id: Option<String>,
+    issn_linking: Option<String>,
+}
+
+impl MedlineJournalInfo {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            country: None,
+            medline_ta: None,
+            nlm_unique_id: None,
+            issn_linking: None,
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Country" => ret.country = n.text().map(|v| v.to_string()),
+                "MedlineTA" => ret.medline_ta = n.text().map(|v| v.to_string()),
+                "NlmUniqueID" => ret.nlm_unique_id = n.text().map(|v| v.to_string()),
+                "ISSNLinking" => ret.issn_linking = n.text().map(|v| v.to_string()),
+                x => println!("Not covered in MedlineJournalInfo: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
     pmid: u64,
     date_completed: Option<PubMedDate>,
     date_revised: Option<PubMedDate>,
     mesh_heading_list: Vec<MeshHeading>,
+    medline_journal_info: Option<MedlineJournalInfo>,
     article: Option<Article>,
 }
 
@@ -411,6 +462,7 @@ impl Work {
             date_completed: None,
             date_revised: None,
             mesh_heading_list: vec![],
+            medline_journal_info: None,
             article: None,
         }
     }
@@ -425,6 +477,9 @@ impl Work {
                 "DateCompleted" => self.date_completed = PubMedDate::new_from_xml(&node),
                 "DateRevised" => self.date_revised = PubMedDate::new_from_xml(&node),
                 "Article" => self.article = Some(Article::new_from_xml(&node)),
+                "MedlineJournalInfo" => {
+                    self.medline_journal_info = Some(MedlineJournalInfo::new_from_xml(&node))
+                }
                 "MeshHeadingList" => {
                     self.mesh_heading_list = node
                         .descendants()
