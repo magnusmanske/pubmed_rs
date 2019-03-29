@@ -455,6 +455,39 @@ pub struct OtherID {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Keyword {
+    pub keyword: String,
+    pub major_topic: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeywordList {
+    pub owner: Option<String>,
+    pub keywords: Vec<Keyword>,
+}
+
+impl KeywordList {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            owner: node.attribute("Owner").map(|v| v.to_string()),
+            keywords: vec![],
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Keyword" => {
+                    ret.keywords.push(Keyword {
+                        major_topic: n.attribute("MajorTopicYN").map_or(false, |v| v == "Y"),
+                        keyword: n.text().map_or("".to_string(), |v| v.to_string()),
+                    });
+                }
+                x => println!("Not covered in KeywordList: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
     pub pmid: u64,
     pub date_completed: Option<PubMedDate>,
@@ -464,6 +497,7 @@ pub struct Work {
     pub article: Option<Article>,
     pub other_ids: Vec<OtherID>,
     pub citation_subsets: Vec<String>,
+    pub keyword_lists: Vec<KeywordList>,
 }
 
 impl Work {
@@ -477,6 +511,7 @@ impl Work {
             article: None,
             other_ids: vec![],
             citation_subsets: vec![],
+            keyword_lists: vec![],
         }
     }
 
@@ -487,6 +522,7 @@ impl Work {
                     Some(id) => self.pmid = id.parse::<u64>().unwrap(),
                     None => {}
                 },
+                "KeywordList" => self.keyword_lists.push(KeywordList::new_from_xml(&node)),
                 "OtherID" => self.other_ids.push(OtherID {
                     source: node.attribute("Source").map(|v| v.to_string()),
                     id: node.text().map(|v| v.to_string()),
@@ -515,7 +551,7 @@ impl Work {
     fn import_pubmed_data_from_xml(&mut self, root: &roxmltree::Node) {
         for node in root.descendants().filter(|n| n.is_element()) {
             match node.tag_name().name() {
-                _x => {} //println!("Not covered in PubmedData: '{}'", x),//TODO
+                x => println!("Not covered in PubmedData: '{}'", x), //TODO
             }
         }
     }
