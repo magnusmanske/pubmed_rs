@@ -1,9 +1,18 @@
 extern crate roxmltree;
 
 use reqwest;
+use std::{thread, time};
 //use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json;
+
+#[cfg(debug_assertions)]
+fn missing_tag_warning(_s: &str) {
+    println!("{}", _s);
+}
+
+#[cfg(not(debug_assertions))]
+fn missing_tag_warning(_s: &str) {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PubMedDate {
@@ -56,7 +65,11 @@ impl PubMedDate {
                         .text()
                         .map_or(-1, |v| v.to_string().parse::<i8>().unwrap_or(-1))
                 }
-                x => println!("Not covered in PubMedDate: '{}'", x),
+                "Season" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=11364263
+                }
+                x => missing_tag_warning(&format!("Not covered in PubMedDate: '{}'", x)),
             }
         }
         match ret.precision() {
@@ -165,19 +178,39 @@ impl Abstract {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AffiliationInfo {
-    affiliation: Option<String>,
+    pub affiliation: Option<String>,
+    pub identifiers: Vec<Identifier>,
 }
 
 impl AffiliationInfo {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
-        let mut ret = Self { affiliation: None };
+        let mut ret = Self {
+            affiliation: None,
+            identifiers: vec![],
+        };
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "Affiliation" => ret.affiliation = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in AffiliationInfo: '{}'", x),
+                "Identifier" => ret.identifiers.push(Identifier::new_from_xml(&n)),
+                x => missing_tag_warning(&format!("Not covered in AffiliationInfo: '{}'", x)),
             }
         }
         ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Identifier {
+    pub id: Option<String>,
+    pub source: Option<String>,
+}
+
+impl Identifier {
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        Self {
+            id: node.text().map(|v| v.to_string()),
+            source: node.attribute("Source").map(|v| v.to_string()),
+        }
     }
 }
 
@@ -186,7 +219,10 @@ pub struct Author {
     pub last_name: Option<String>,
     pub fore_name: Option<String>,
     pub initials: Option<String>,
+    pub suffix: Option<String>,
+    pub collective_name: Option<String>,
     pub affiliation_info: Option<AffiliationInfo>,
+    pub identifiers: Vec<Identifier>,
     pub valid: bool,
 }
 
@@ -196,17 +232,22 @@ impl Author {
             last_name: None,
             fore_name: None,
             initials: None,
+            suffix: None,
+            collective_name: None,
             affiliation_info: None,
+            identifiers: vec![],
             valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
         };
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "LastName" => ret.last_name = n.text().map(|v| v.to_string()),
                 "ForeName" => ret.fore_name = n.text().map(|v| v.to_string()),
+                "CollectiveName" => ret.collective_name = n.text().map(|v| v.to_string()),
                 "Initials" => ret.initials = n.text().map(|v| v.to_string()),
+                "Suffix" => ret.suffix = n.text().map(|v| v.to_string()),
+                "Identifier" => ret.identifiers.push(Identifier::new_from_xml(&n)),
                 "AffiliationInfo" => ret.affiliation_info = Some(AffiliationInfo::new_from_xml(&n)),
-
-                x => println!("Not covered in Author: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in Author: '{}'", x)),
             }
         }
         ret
@@ -260,7 +301,7 @@ impl JournalIssue {
                 }
                 "Volume" => ret.volume = n.text().map(|v| v.to_string()),
                 "Issue" => ret.issue = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in JournalIssue: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in JournalIssue: '{}'", x)),
             }
         }
         ret
@@ -298,7 +339,7 @@ impl Journal {
                 "JournalIssue" => ret.journal_issue = Some(JournalIssue::new_from_xml(&n)),
                 "Title" => ret.title = n.text().map(|v| v.to_string()),
                 "ISOAbbreviation" => ret.iso_abbreviation = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in Journal: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in Journal: '{}'", x)),
             }
         }
         ret
@@ -332,7 +373,7 @@ impl Grant {
                 "Agency" => ret.agency = n.text().map(|v| v.to_string()),
                 "Country" => ret.country = n.text().map(|v| v.to_string()),
                 "Acronym" => ret.acronym = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in Grant: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in Grant: '{}'", x)),
             }
         }
         ret
@@ -383,6 +424,7 @@ pub struct Article {
     pub the_abstract: Option<Abstract>,
     pub author_list: Option<AuthorList>,
     pub language: Option<String>,
+    pub vernacular_title: Option<String>,
     pub grant_list: Option<GrantList>,
     pub publication_type_list: Vec<PublicationType>,
     pub article_date: Vec<PubMedDate>,
@@ -399,6 +441,7 @@ impl Article {
             the_abstract: None,
             author_list: None,
             language: None,
+            vernacular_title: None,
             grant_list: None,
             publication_type_list: vec![],
             article_date: vec![],
@@ -418,7 +461,9 @@ impl Article {
                             "MedlinePgn" => ret.pagination.push(Pagination::MedlinePgn(
                                 n2.text().or(Some("")).unwrap().to_string(),
                             )),
-                            x => println!("Not covered in Pagination: '{}'", x),
+                            x => {
+                                missing_tag_warning(&format!("Not covered in Pagination: '{}'", x))
+                            }
                         }
                     }
                 }
@@ -426,6 +471,7 @@ impl Article {
                 "Abstract" => ret.the_abstract = Some(Abstract::new_from_xml(&n)),
                 "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
+                "VernacularTitle" => ret.vernacular_title = n.text().map(|v| v.to_string()),
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
                 "ArticleDate" => ret.article_date.push(PubMedDate::new_from_xml(&n).unwrap()),
                 "PublicationTypeList" => {
@@ -435,8 +481,11 @@ impl Article {
                         .map(|n| PublicationType::new_from_xml(&n))
                         .collect()
                 }
-                //"ArticleDate" => {}
-                x => println!("Not covered in Article: '{}'", x),
+                "DataBankList" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=2567002
+                }
+                x => missing_tag_warning(&format!("Not covered in Article: '{}'", x)),
             }
         }
         ret
@@ -467,7 +516,7 @@ impl MedlineJournalInfo {
                 "MedlineTA" => ret.medline_ta = n.text().map(|v| v.to_string()),
                 "NlmUniqueID" => ret.nlm_unique_id = n.text().map(|v| v.to_string()),
                 "ISSNLinking" => ret.issn_linking = n.text().map(|v| v.to_string()),
-                x => println!("Not covered in MedlineJournalInfo: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in MedlineJournalInfo: '{}'", x)),
             }
         }
         ret
@@ -506,7 +555,7 @@ impl KeywordList {
                         keyword: n.text().map_or("".to_string(), |v| v.to_string()),
                     });
                 }
-                x => println!("Not covered in KeywordList: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in KeywordList: '{}'", x)),
             }
         }
         ret
@@ -543,7 +592,7 @@ impl Chemical {
                     ret.name_of_substance = n.text().map(|v| v.to_string());
                     ret.name_of_substance_ui = n.attribute("UI").map(|v| v.to_string())
                 }
-                x => println!("Not covered in Chemical: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in Chemical: '{}'", x)),
             }
         }
         ret
@@ -560,8 +609,12 @@ pub struct MedlineCitation {
     pub article: Option<Article>,
     pub other_ids: Vec<OtherID>,
     pub citation_subsets: Vec<String>,
+    pub gene_symbol_list: Vec<String>,
     pub keyword_lists: Vec<KeywordList>,
     pub chemical_list: Vec<Chemical>,
+    pub investigator_list: Vec<Author>,
+    pub coi_statement: Option<String>,
+    pub number_of_references: Option<String>,
 }
 
 impl MedlineCitation {
@@ -575,8 +628,12 @@ impl MedlineCitation {
             article: None,
             other_ids: vec![],
             citation_subsets: vec![],
+            gene_symbol_list: vec![],
             keyword_lists: vec![],
             chemical_list: vec![],
+            investigator_list: vec![],
+            coi_statement: None,
+            number_of_references: None,
         }
     }
 
@@ -584,7 +641,36 @@ impl MedlineCitation {
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "Chemical" => self.chemical_list.push(Chemical::new_from_xml(&n)),
-                x => println!("Not covered in MedlineCitation::ChemicalList: '{}'", x),
+                x => missing_tag_warning(&format!(
+                    "Not covered in MedlineCitation::ChemicalList: '{}'",
+                    x
+                )),
+            }
+        }
+    }
+
+    fn investigator_list(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Investigator" => self.investigator_list.push(Author::new_from_xml(&n)),
+                x => missing_tag_warning(&format!(
+                    "Not covered in MedlineCitation::InvestigatorList: '{}'",
+                    x
+                )),
+            }
+        }
+    }
+
+    fn gene_symbol_list(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "GeneSymbol" => self
+                    .gene_symbol_list
+                    .push(n.text().map(|v| v.to_string()).unwrap_or("".to_string())),
+                x => missing_tag_warning(&format!(
+                    "Not covered in MedlineCitation::GeneSymbolList: '{}'",
+                    x
+                )),
             }
         }
     }
@@ -597,8 +683,12 @@ impl MedlineCitation {
                     Some(id) => ret.pmid = id.parse::<u64>().unwrap(),
                     None => {}
                 },
+                "CoiStatement" => ret.coi_statement = n.text().map(|v| v.to_string()),
+                "NumberOfReferences" => ret.number_of_references = n.text().map(|v| v.to_string()),
                 "KeywordList" => ret.keyword_lists.push(KeywordList::new_from_xml(&n)),
                 "ChemicalList" => ret.chemical_list(&n),
+                "GeneSymbolList" => ret.gene_symbol_list(&n),
+                "InvestigatorList" => ret.investigator_list(&n),
                 "OtherID" => ret.other_ids.push(OtherID {
                     source: n.attribute("Source").map(|v| v.to_string()),
                     id: n.text().map(|v| v.to_string()),
@@ -619,7 +709,23 @@ impl MedlineCitation {
                         .map(|n| MeshHeading::new_from_xml(&n))
                         .collect()
                 }
-                x => println!("Not covered in MedlineCitation: '{}'", x),
+                "GeneralNote" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=12233518
+                }
+                "OtherAbstract" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=11364263
+                }
+                "SupplMeshList" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=14300027
+                }
+                "CommentsCorrectionsList" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=21392701
+                }
+                x => missing_tag_warning(&format!("Not covered in MedlineCitation: '{}'", x)),
             }
         }
         ret
@@ -646,7 +752,7 @@ impl ArticleIdList {
                     id_type: n.attribute("IdType").map(|v| v.to_string()),
                     id: n.text().map(|v| v.to_string()),
                 }),
-                x => println!("Not covered in ArticleIdList: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in ArticleIdList: '{}'", x)),
             }
         }
         ret
@@ -669,7 +775,7 @@ impl Reference {
             match n.tag_name().name() {
                 "Citation" => ret.citation = n.text().map(|v| v.to_string()),
                 "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
-                x => println!("Not covered in Reference: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in Reference: '{}'", x)),
             }
         }
         ret
@@ -698,7 +804,7 @@ impl PubmedData {
                 "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
                 "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
                 "History" => ret.add_history_from_xml(&n),
-                x => println!("Not covered in PubmedData: '{}'", x), //TODO
+                x => missing_tag_warning(&format!("Not covered in PubmedData: '{}'", x)), //TODO
             }
         }
         ret
@@ -708,7 +814,10 @@ impl PubmedData {
         for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
                 "PubMedPubDate" => self.history.push(PubMedDate::new_from_xml(&n).unwrap()),
-                x => println!("Not covered in PubmedData::add_history_from_xml: '{}'", x),
+                x => missing_tag_warning(&format!(
+                    "Not covered in PubmedData::add_history_from_xml: '{}'",
+                    x
+                )),
             }
         }
     }
@@ -744,7 +853,7 @@ impl PubmedArticle {
                     ret.medline_citation = Some(MedlineCitation::new_from_xml(&node))
                 }
                 "PubmedData" => ret.pubmed_data = Some(PubmedData::new_from_xml(&node)),
-                x => println!("Not covered in PubmedArticle: '{}'", x),
+                x => missing_tag_warning(&format!("Not covered in PubmedArticle: '{}'", x)),
             }
         }
         ret
@@ -787,6 +896,8 @@ impl Client {
                 + &ids.join(",");
         let text = reqwest::get(url.as_str())?.text()?;
         let doc = roxmltree::Document::parse(&text)?;
+        let duration = time::Duration::from_millis(400); // To avoid being blocked by PubMed API
+        thread::sleep(duration);
         Ok(doc
             .root()
             .descendants()
