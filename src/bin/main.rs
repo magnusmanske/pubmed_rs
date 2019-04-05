@@ -10,7 +10,9 @@ fn main() {
         let works = client.works(&ids);
     */
     let articles = client
-        .articles(&vec![22722859, 19348744, 25081398])
+        .articles(&vec![22595786]) //[22722859, 19348744, 25081398]
         .unwrap(); // 22722859,19348744,25081398
-    println!("{}", serde_json::to_string(&articles[0]).unwrap());
+    if true {
+        println!("{}", serde_json::to_string(&articles[0]).unwrap());
+    }
 }

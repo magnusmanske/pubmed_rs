@@ -315,6 +315,7 @@ pub struct Grant {
     pub grant_id: Option<String>,
     pub agency: Option<String>,
     pub country: Option<String>,
+    pub acronym: Option<String>,
 }
 
 impl Grant {
@@ -323,12 +324,14 @@ impl Grant {
             grant_id: None,
             agency: None,
             country: None,
+            acronym: None,
         };
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "GrantID" => ret.grant_id = n.text().map(|v| v.to_string()),
                 "Agency" => ret.agency = n.text().map(|v| v.to_string()),
                 "Country" => ret.country = n.text().map(|v| v.to_string()),
+                "Acronym" => ret.acronym = n.text().map(|v| v.to_string()),
                 x => println!("Not covered in Grant: '{}'", x),
             }
         }
@@ -511,6 +514,43 @@ impl KeywordList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Chemical {
+    registry_number: Option<String>,
+    name_of_substance: Option<String>,
+    name_of_substance_ui: Option<String>,
+}
+
+impl Chemical {
+    /*
+        pub fn new () -> Self {
+            Self {
+                registry_number:None,
+                name_of_substance:None,
+                name_of_substance_id:None,
+            }
+        }
+    */
+    pub fn new_from_xml(node: &roxmltree::Node) -> Self {
+        let mut ret = Self {
+            registry_number: None,
+            name_of_substance: None,
+            name_of_substance_ui: None,
+        };
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "RegistryNumber" => ret.registry_number = n.text().map(|v| v.to_string()),
+                "NameOfSubstance" => {
+                    ret.name_of_substance = n.text().map(|v| v.to_string());
+                    ret.name_of_substance_ui = n.attribute("UI").map(|v| v.to_string())
+                }
+                x => println!("Not covered in Chemical: '{}'", x),
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MedlineCitation {
     pub pmid: u64,
     pub date_completed: Option<PubMedDate>,
@@ -521,6 +561,7 @@ pub struct MedlineCitation {
     pub other_ids: Vec<OtherID>,
     pub citation_subsets: Vec<String>,
     pub keyword_lists: Vec<KeywordList>,
+    pub chemical_list: Vec<Chemical>,
 }
 
 impl MedlineCitation {
@@ -535,6 +576,16 @@ impl MedlineCitation {
             other_ids: vec![],
             citation_subsets: vec![],
             keyword_lists: vec![],
+            chemical_list: vec![],
+        }
+    }
+
+    fn chemical_list(&mut self, node: &roxmltree::Node) {
+        for n in node.children().filter(|n| n.is_element()) {
+            match n.tag_name().name() {
+                "Chemical" => self.chemical_list.push(Chemical::new_from_xml(&n)),
+                x => println!("Not covered in MedlineCitation::ChemicalList: '{}'", x),
+            }
         }
     }
 
@@ -547,6 +598,7 @@ impl MedlineCitation {
                     None => {}
                 },
                 "KeywordList" => ret.keyword_lists.push(KeywordList::new_from_xml(&n)),
+                "ChemicalList" => ret.chemical_list(&n),
                 "OtherID" => ret.other_ids.push(OtherID {
                     source: n.attribute("Source").map(|v| v.to_string()),
                     id: n.text().map(|v| v.to_string()),
