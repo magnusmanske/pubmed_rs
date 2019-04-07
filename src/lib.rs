@@ -8,7 +8,7 @@ use serde_json;
 
 #[cfg(debug_assertions)]
 fn missing_tag_warning(_s: &str) {
-    println!("{}", _s);
+    panic!("{}", _s);
 }
 
 #[cfg(not(debug_assertions))]
@@ -708,6 +708,10 @@ impl MedlineCitation {
                         .filter(|n| n.is_element() && n.tag_name().name() == "MeshHeading")
                         .map(|n| MeshHeading::new_from_xml(&n))
                         .collect()
+                }
+                "PersonalNameSubjectList" => {
+                    // TODO
+                    // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=24332228
                 }
                 "GeneralNote" => {
                     // TODO
