@@ -10,12 +10,12 @@ fn check_random_paper(client: &pubmed::Client) {
 // This is just used for testing
 fn main() {
     let client = pubmed::Client::new();
-    if true {
+    if false {
         loop {
             check_random_paper(&client);
         }
     } else {
-        let articles = client.articles(&vec![10778477]).unwrap();
+        let articles = client.articles(&vec![30947298]).unwrap();
         if true {
             println!("{}", serde_json::to_string(&articles[0]).unwrap());
         }
