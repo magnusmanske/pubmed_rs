@@ -170,7 +170,7 @@ impl Abstract {
             text: node
                 .descendants()
                 .filter(|n| n.is_element() && n.tag_name().name() == "AbstractText")
-                .map(|n| n.text().or(Some("")).unwrap().to_string())
+                .map(|n| n.text().or(Some("")).unwrap_or("").to_string())
                 .next(),
         }
     }
@@ -459,7 +459,7 @@ impl Article {
                     for n2 in n.children().filter(|n| n.is_element()) {
                         match n2.tag_name().name() {
                             "MedlinePgn" => ret.pagination.push(Pagination::MedlinePgn(
-                                n2.text().or(Some("")).unwrap().to_string(),
+                                n2.text().or(Some("")).unwrap_or("").to_string(),
                             )),
                             x => {
                                 missing_tag_warning(&format!("Not covered in Pagination: '{}'", x))
@@ -882,11 +882,25 @@ impl Client {
             + "&retmax="
             + &max.to_string()
             + "&term=" + query;
+        //println!("PubMed::article_ids_from_query: {}", &url);
         let json: serde_json::Value = reqwest::get(url.as_str())?.json()?;
         match json["esearchresult"]["idlist"].as_array() {
             Some(idlist) => Ok(idlist
                 .iter()
-                .map(|id| id.as_str().unwrap().parse::<u64>().unwrap())
+                .map(|id| match id.as_str() {
+                    Some(x) => match x.parse::<u64>() {
+                        Ok(u) => u,
+                        Err(_) => {
+                            println!(
+                                "PubMed::article_ids_from_query: '{}' should be a numeric ID",
+                                &x
+                            );
+                            0
+                        }
+                    },
+                    None => 0,
+                })
+                .filter(|id| *id != 0)
                 .collect()),
             None => Err(From::from("API error/no results")),
         }
