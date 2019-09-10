@@ -1,10 +1,12 @@
 extern crate roxmltree;
 
 use reqwest;
-use std::{thread, time};
-//use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::{thread, time};
 
 #[cfg(debug_assertions)]
 fn missing_tag_warning(_s: &str) {
@@ -865,23 +867,34 @@ impl PubmedArticle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Client {}
+pub struct Client {
+    api_key: Option<String>,
+}
 
 impl Client {
     pub fn new() -> Self {
-        Client {}
+        let mut ret = Client { api_key: None };
+        match File::open("ncbi_key") {
+            Ok(mut f) => {
+                let mut buffer = String::new();
+                match f.read_to_string(&mut buffer) {
+                    Ok(_) => {
+                        ret.api_key = Some(buffer);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        ret
     }
 
     pub fn article_ids_from_query(
         &self,
         query: &String,
         max: u64,
-    ) -> Result<Vec<u64>, Box<::std::error::Error>> {
-        let url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json"
-            .to_string()
-            + "&retmax="
-            + &max.to_string()
-            + "&term=" + query;
+    ) -> Result<Vec<u64>, Box<dyn Error>> {
+        let url = format!("http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",max,query);
         //println!("PubMed::article_ids_from_query: {}", &url);
         let json: serde_json::Value = reqwest::get(url.as_str())?.json()?;
         match json["esearchresult"]["idlist"].as_array() {
@@ -906,16 +919,15 @@ impl Client {
         }
     }
 
-    pub fn articles(&self, ids: &Vec<u64>) -> Result<Vec<PubmedArticle>, Box<::std::error::Error>> {
+    pub fn articles(&self, ids: &Vec<u64>) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
         let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
-        let url =
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id="
-                .to_string()
-                + &ids.join(",");
+        let url = format!(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}",
+            ids.join(",")
+        );
         let text = reqwest::get(url.as_str())?.text()?;
         let doc = roxmltree::Document::parse(&text)?;
-        let duration = time::Duration::from_millis(400); // To avoid being blocked by PubMed API
-        thread::sleep(duration);
+        thread::sleep(self.get_sleep_time()); // To avoid being blocked by PubMed API
         Ok(doc
             .root()
             .descendants()
@@ -924,7 +936,14 @@ impl Client {
             .collect())
     }
 
-    pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<::std::error::Error>> {
+    fn get_sleep_time(&self) -> time::Duration {
+        match self.api_key {
+            Some(_) => time::Duration::from_millis(120), // 10/sec with api_key
+            None => time::Duration::from_millis(400),    // 3/sec without api key
+        }
+    }
+
+    pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
         match self.articles(&vec![id])?.pop() {
             Some(pubmed_article) => Ok(pubmed_article),
             None => Err(From::from(format!(
