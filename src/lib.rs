@@ -139,22 +139,21 @@ pub struct MeshHeading {
 }
 
 impl MeshHeading {
-    fn new_from_xml(node: &roxmltree::Node) -> Self {
+    fn new_from_xml(node: &roxmltree::Node) -> Option<Self> {
         let node_descriptor = node
             .descendants()
             .filter(|n| n.is_element() && n.tag_name().name() == "DescriptorName")
-            .next()
-            .unwrap();
+            .next()?;
         let qualifiers = node
             .descendants()
             .filter(|n| n.is_element() && n.tag_name().name() == "QualifierName")
             .map(|n| MeshTermPart::new_from_xml(&n))
             .collect();
 
-        Self {
+        Some(Self {
             descriptor: MeshTermPart::new_from_xml(&node_descriptor),
             qualifiers: qualifiers,
-        }
+        })
     }
 }
 
@@ -492,7 +491,10 @@ impl Article {
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
                 "VernacularTitle" => ret.vernacular_title = n.text().map(|v| v.to_string()),
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
-                "ArticleDate" => ret.article_date.push(PubMedDate::new_from_xml(&n).unwrap()),
+                "ArticleDate" => match PubMedDate::new_from_xml(&n) {
+                    Some(date) => ret.article_date.push(date),
+                    None => {}
+                },
                 "PublicationTypeList" => {
                     ret.publication_type_list = n
                         .children()
@@ -699,7 +701,7 @@ impl MedlineCitation {
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
                 "PMID" => match n.text() {
-                    Some(id) => ret.pmid = id.parse::<u64>().unwrap(),
+                    Some(id) => ret.pmid = id.parse::<u64>().unwrap_or(0),
                     None => {}
                 },
                 "CoiStatement" => ret.coi_statement = n.text().map(|v| v.to_string()),
@@ -712,9 +714,10 @@ impl MedlineCitation {
                     source: n.attribute("Source").map(|v| v.to_string()),
                     id: n.text().map(|v| v.to_string()),
                 }),
-                "CitationSubset" => ret
-                    .citation_subsets
-                    .push(n.text().map(|v| v.to_string()).unwrap()),
+                "CitationSubset" => match n.text().map(|v| v.to_string()) {
+                    Some(subset) => ret.citation_subsets.push(subset),
+                    None => {}
+                },
                 "DateCompleted" => ret.date_completed = PubMedDate::new_from_xml(&n),
                 "DateRevised" => ret.date_revised = PubMedDate::new_from_xml(&n),
                 "Article" => ret.article = Some(Article::new_from_xml(&n)),
@@ -725,7 +728,7 @@ impl MedlineCitation {
                     ret.mesh_heading_list = n
                         .descendants()
                         .filter(|n| n.is_element() && n.tag_name().name() == "MeshHeading")
-                        .map(|n| MeshHeading::new_from_xml(&n))
+                        .filter_map(|n| MeshHeading::new_from_xml(&n))
                         .collect()
                 }
                 "PersonalNameSubjectList" => {
@@ -836,7 +839,10 @@ impl PubmedData {
     fn add_history_from_xml(&mut self, node: &roxmltree::Node) {
         for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
-                "PubMedPubDate" => self.history.push(PubMedDate::new_from_xml(&n).unwrap()),
+                "PubMedPubDate" => match PubMedDate::new_from_xml(&n) {
+                    Some(date) => self.history.push(date),
+                    None => {}
+                },
                 x => missing_tag_warning(&format!(
                     "Not covered in PubmedData::add_history_from_xml: '{}'",
                     x
