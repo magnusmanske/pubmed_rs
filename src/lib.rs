@@ -47,11 +47,7 @@ impl PubMedDate {
                         .text()
                         .map_or(0, |v| v.to_string().parse::<u32>().unwrap_or(0))
                 }
-                "Month" => {
-                    ret.month = n
-                        .text()
-                        .map_or(0, |v| v.to_string().parse::<u8>().unwrap_or(0))
-                }
+                "Month" => ret.month = Self::parse_month_from_xml(&n),
                 "Day" => {
                     ret.day = n
                         .text()
@@ -77,6 +73,27 @@ impl PubMedDate {
         match ret.precision() {
             0 => None,
             _ => Some(ret),
+        }
+    }
+
+    fn parse_month_from_xml(node: &roxmltree::Node) -> u8 {
+        match node.text() {
+            Some(t) => match t.to_lowercase().as_str() {
+                "jan" => 1,
+                "feb" => 2,
+                "mar" => 3,
+                "apr" => 4,
+                "may" => 5,
+                "jun" => 6,
+                "jul" => 7,
+                "aug" => 8,
+                "sep" => 9,
+                "oct" => 10,
+                "nov" => 11,
+                "dec" => 12,
+                other => other.to_string().parse::<u8>().unwrap_or(0),
+            },
+            None => 0,
         }
     }
 
@@ -957,7 +974,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_doi() {
+    fn doi() {
         let client = super::Client::new();
         let ids = client
             .article_ids_from_query(&"\"10.1038/NATURE11174\"".to_string(), 1000)
@@ -966,7 +983,7 @@ mod tests {
     }
 
     #[test]
-    fn test_work() {
+    fn work() {
         let client = super::Client::new();
         let article = client.article(22722859).unwrap();
         let date = article
@@ -978,5 +995,25 @@ mod tests {
         assert_eq!(date.year, 2012);
         assert_eq!(date.month, 8);
         assert_eq!(date.day, 17);
+    }
+
+    #[test]
+    fn date_parsing() {
+        let client = super::Client::new();
+        let article = client.article(13777676).unwrap();
+        let date = article
+            .medline_citation
+            .unwrap()
+            .article
+            .unwrap()
+            .journal
+            .unwrap()
+            .journal_issue
+            .unwrap()
+            .pub_date
+            .unwrap();
+        assert_eq!(date.year, 1961);
+        assert_eq!(date.month, 5);
+        assert_eq!(date.day, 0);
     }
 }
