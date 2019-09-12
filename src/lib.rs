@@ -960,10 +960,13 @@ impl Client {
     }
 
     fn get_sleep_time(&self) -> time::Duration {
+        /*
         match self.api_key {
             Some(_) => time::Duration::from_millis(120), // 10/sec with api_key
             None => time::Duration::from_millis(400),    // 3/sec without api key
         }
+        */
+        time::Duration::from_millis(500) // Blanket default
     }
 
     pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
