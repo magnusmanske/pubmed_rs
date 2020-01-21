@@ -919,7 +919,7 @@ impl Client {
     ) -> Result<Vec<u64>, Box<dyn Error>> {
         let url = format!("http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",max,query);
         //println!("PubMed::article_ids_from_query: {}", &url);
-        let json: serde_json::Value = reqwest::get(url.as_str())?.json()?;
+        let json: serde_json::Value = reqwest::blocking::get(url.as_str())?.json()?;
         match json["esearchresult"]["idlist"].as_array() {
             Some(idlist) => Ok(idlist
                 .iter()
@@ -948,7 +948,7 @@ impl Client {
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}",
             ids.join(",")
         );
-        let text = reqwest::get(url.as_str())?.text()?;
+        let text = reqwest::blocking::get(url.as_str())?.text()?;
         let doc = roxmltree::Document::parse(&text)?;
         thread::sleep(self.get_sleep_time()); // To avoid being blocked by PubMed API
         Ok(doc

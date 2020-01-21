@@ -16,6 +16,6 @@ include = [
 [dependencies]
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
-reqwest = "*"
-roxmltree = "0.6.0"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+roxmltree = "*" #"0.6.0"
 rand = "*"
