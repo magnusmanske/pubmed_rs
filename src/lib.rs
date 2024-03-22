@@ -936,14 +936,14 @@ impl Client {
         ret
     }
 
-    pub fn article_ids_from_query(
+    pub async fn article_ids_from_query(
         &self,
         query: &String,
         max: u64,
     ) -> Result<Vec<u64>, Box<dyn Error>> {
         let url = format!("http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",max,query);
         //println!("PubMed::article_ids_from_query: {}", &url);
-        let json: serde_json::Value = reqwest::blocking::get(url.as_str())?.json()?;
+        let json: serde_json::Value = reqwest::get(url.as_str()).await?.json().await?;
         match json["esearchresult"]["idlist"].as_array() {
             Some(idlist) => Ok(idlist
                 .iter()
@@ -1016,11 +1016,12 @@ impl Default for Client {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn doi() {
+    #[tokio::test]
+    async fn doi() {
         let client = super::Client::new();
         let ids = client
             .article_ids_from_query(&"\"10.1038/NATURE11174\"".to_string(), 1000)
+            .await
             .unwrap();
         assert_eq!(ids, vec![22722859])
     }
