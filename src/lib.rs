@@ -966,13 +966,13 @@ impl Client {
         }
     }
 
-    pub fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
+    pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
         let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
         let url = format!(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}",
             ids.join(",")
         );
-        let text = reqwest::blocking::get(url.as_str())?.text()?;
+        let text = reqwest::get(url.as_str()).await?.text().await?;
         let parsing_options = ParsingOptions {
             allow_dtd: true,
             nodes_limit: u32::MAX,
@@ -997,8 +997,8 @@ impl Client {
         time::Duration::from_millis(500) // Blanket default
     }
 
-    pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
-        match self.articles(&[id])?.pop() {
+    pub async fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
+        match self.articles(&[id]).await?.pop() {
             Some(pubmed_article) => Ok(pubmed_article),
             None => Err(From::from(format!(
                 "Can't find PubmedArticle for ID '{}'",
@@ -1026,10 +1026,10 @@ mod tests {
         assert_eq!(ids, vec![22722859])
     }
 
-    #[test]
-    fn work() {
+    #[tokio::test]
+    async fn work() {
         let client = super::Client::new();
-        let article = client.article(22722859).unwrap();
+        let article = client.article(22722859).await.unwrap();
         let date = article
             .medline_citation
             .unwrap()
@@ -1041,10 +1041,10 @@ mod tests {
         assert_eq!(date.day, 17);
     }
 
-    #[test]
-    fn date_parsing() {
+    #[tokio::test]
+    async fn date_parsing() {
         let client = super::Client::new();
-        let article = client.article(13777676).unwrap();
+        let article = client.article(13777676).await.unwrap();
         println!("{:?}", article);
         let date = article
             .medline_citation
