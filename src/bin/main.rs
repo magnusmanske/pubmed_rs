@@ -1,6 +1,3 @@
-//use rand::prelude::*;
-use serde_json;
-
 fn check_random_paper(client: &pubmed::Client) {
     let pmid = rand::random::<u64>() % 5e7 as u64;
     println!("Trying PMID https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}", pmid);

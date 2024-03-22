@@ -1,8 +1,7 @@
 extern crate roxmltree;
 
-use reqwest;
+use roxmltree::ParsingOptions;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -142,8 +141,7 @@ impl MeshHeading {
     fn new_from_xml(node: &roxmltree::Node) -> Option<Self> {
         let node_descriptor = node
             .descendants()
-            .filter(|n| n.is_element() && n.tag_name().name() == "DescriptorName")
-            .next()?;
+            .find(|n| n.is_element() && n.tag_name().name() == "DescriptorName")?;
         let qualifiers = node
             .descendants()
             .filter(|n| n.is_element() && n.tag_name().name() == "QualifierName")
@@ -152,7 +150,7 @@ impl MeshHeading {
 
         Some(Self {
             descriptor: MeshTermPart::new_from_xml(&node_descriptor),
-            qualifiers: qualifiers,
+            qualifiers,
         })
     }
 }
@@ -326,6 +324,12 @@ impl JournalIssue {
     }
 }
 
+impl Default for JournalIssue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Journal {
     pub issn: Option<String>,
@@ -361,6 +365,12 @@ impl Journal {
             }
         }
         ret
+    }
+}
+
+impl Default for Journal {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -479,6 +489,8 @@ impl Article {
                             "MedlinePgn" => ret.pagination.push(Pagination::MedlinePgn(
                                 n2.text().or(Some("")).unwrap_or("").to_string(),
                             )),
+                            "StartPage" => {} // TODO
+                            "EndPage" => {} // TODO
                             x => {
                                 missing_tag_warning(&format!("Not covered in Pagination: '{}'", x))
                             }
@@ -491,10 +503,11 @@ impl Article {
                 "Language" => ret.language = n.text().map(|v| v.to_string()),
                 "VernacularTitle" => ret.vernacular_title = n.text().map(|v| v.to_string()),
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
-                "ArticleDate" => match PubMedDate::new_from_xml(&n) {
-                    Some(date) => ret.article_date.push(date),
-                    None => {}
-                },
+                "ArticleDate" => {
+                    if let Some(date) = PubMedDate::new_from_xml(&n) {
+                        ret.article_date.push(date)
+                    }
+                }
                 "PublicationTypeList" => {
                     ret.publication_type_list = n
                         .children()
@@ -510,6 +523,12 @@ impl Article {
             }
         }
         ret
+    }
+}
+
+impl Default for Article {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -685,9 +704,11 @@ impl MedlineCitation {
     fn gene_symbol_list(&mut self, node: &roxmltree::Node) {
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
-                "GeneSymbol" => self
-                    .gene_symbol_list
-                    .push(n.text().map(|v| v.to_string()).unwrap_or("".to_string())),
+                "GeneSymbol" => self.gene_symbol_list.push(
+                    n.text()
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "".to_string()),
+                ),
                 x => missing_tag_warning(&format!(
                     "Not covered in MedlineCitation::GeneSymbolList: '{}'",
                     x
@@ -700,10 +721,11 @@ impl MedlineCitation {
         let mut ret = Self::new();
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
-                "PMID" => match n.text() {
-                    Some(id) => ret.pmid = id.parse::<u64>().unwrap_or(0),
-                    None => {}
-                },
+                "PMID" => {
+                    if let Some(id) = n.text() {
+                        ret.pmid = id.parse::<u64>().unwrap_or(0)
+                    }
+                }
                 "CoiStatement" => ret.coi_statement = n.text().map(|v| v.to_string()),
                 "NumberOfReferences" => ret.number_of_references = n.text().map(|v| v.to_string()),
                 "KeywordList" => ret.keyword_lists.push(KeywordList::new_from_xml(&n)),
@@ -714,10 +736,11 @@ impl MedlineCitation {
                     source: n.attribute("Source").map(|v| v.to_string()),
                     id: n.text().map(|v| v.to_string()),
                 }),
-                "CitationSubset" => match n.text().map(|v| v.to_string()) {
-                    Some(subset) => ret.citation_subsets.push(subset),
-                    None => {}
-                },
+                "CitationSubset" => {
+                    if let Some(subset) = n.text().map(|v| v.to_string()) {
+                        ret.citation_subsets.push(subset)
+                    }
+                }
                 "DateCompleted" => ret.date_completed = PubMedDate::new_from_xml(&n),
                 "DateRevised" => ret.date_revised = PubMedDate::new_from_xml(&n),
                 "Article" => ret.article = Some(Article::new_from_xml(&n)),
@@ -755,6 +778,12 @@ impl MedlineCitation {
             }
         }
         ret
+    }
+}
+
+impl Default for MedlineCitation {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -839,10 +868,11 @@ impl PubmedData {
     fn add_history_from_xml(&mut self, node: &roxmltree::Node) {
         for n in node.children().filter(|v| v.is_element()) {
             match n.tag_name().name() {
-                "PubMedPubDate" => match PubMedDate::new_from_xml(&n) {
-                    Some(date) => self.history.push(date),
-                    None => {}
-                },
+                "PubMedPubDate" => {
+                    if let Some(date) = PubMedDate::new_from_xml(&n) {
+                        self.history.push(date)
+                    }
+                }
                 x => missing_tag_warning(&format!(
                     "Not covered in PubmedData::add_history_from_xml: '{}'",
                     x
@@ -897,17 +927,11 @@ pub struct Client {
 impl Client {
     pub fn new() -> Self {
         let mut ret = Client { api_key: None };
-        match File::open("ncbi_key") {
-            Ok(mut f) => {
-                let mut buffer = String::new();
-                match f.read_to_string(&mut buffer) {
-                    Ok(_) => {
-                        ret.api_key = Some(buffer);
-                    }
-                    _ => {}
-                }
+        if let Ok(mut f) = File::open("ncbi_key") {
+            let mut buffer = String::new();
+            if f.read_to_string(&mut buffer).is_ok() {
+                ret.api_key = Some(buffer);
             }
-            _ => {}
         }
         ret
     }
@@ -942,14 +966,18 @@ impl Client {
         }
     }
 
-    pub fn articles(&self, ids: &Vec<u64>) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
+    pub fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
         let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
         let url = format!(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}",
             ids.join(",")
         );
         let text = reqwest::blocking::get(url.as_str())?.text()?;
-        let doc = roxmltree::Document::parse(&text)?;
+        let parsing_options = ParsingOptions {
+            allow_dtd: true,
+            nodes_limit: u32::MAX,
+            };
+        let doc = roxmltree::Document::parse_with_options(&text, parsing_options)?;
         thread::sleep(self.get_sleep_time()); // To avoid being blocked by PubMed API
         Ok(doc
             .root()
@@ -970,13 +998,19 @@ impl Client {
     }
 
     pub fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
-        match self.articles(&vec![id])?.pop() {
+        match self.articles(&[id])?.pop() {
             Some(pubmed_article) => Ok(pubmed_article),
             None => Err(From::from(format!(
                 "Can't find PubmedArticle for ID '{}'",
                 id
             ))),
         }
+    }
+}
+
+impl Default for Client {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1010,6 +1044,7 @@ mod tests {
     fn date_parsing() {
         let client = super::Client::new();
         let article = client.article(13777676).unwrap();
+        println!("{:?}", article);
         let date = article
             .medline_citation
             .unwrap()
