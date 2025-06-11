@@ -125,7 +125,7 @@ impl MeshTermPart {
     fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             ui: node.attribute("UI").map(|v| v.to_string()),
-            major_topic: node.attribute("MajorTopicYN").map_or(false, |v| v == "Y"),
+            major_topic: node.attribute("MajorTopicYN") == Some("Y"),
             name: node.text().map(|v| v.to_string()),
         }
     }
@@ -169,7 +169,7 @@ impl ELocationID {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             e_id_type: node.attribute("EIdType").map(|v| v.to_string()),
-            valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
+            valid: node.attribute("ValidYN") == Some("Y"),
             id: node.text().map(|v| v.to_string()),
         }
     }
@@ -252,7 +252,7 @@ impl Author {
             collective_name: None,
             affiliation_info: None,
             identifiers: vec![],
-            valid: node.attribute("ValidYN").map_or(false, |v| v == "Y"),
+            valid: node.attribute("ValidYN") == Some("Y"),
         };
         for n in node.children().filter(|n| n.is_element()) {
             match n.tag_name().name() {
@@ -279,7 +279,7 @@ pub struct AuthorList {
 impl AuthorList {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            complete: node.attribute("CompleteYN").map_or(false, |v| v == "Y"),
+            complete: node.attribute("CompleteYN") == Some("Y"),
             authors: node
                 .descendants()
                 .filter(|n| n.is_element() && n.tag_name().name() == "Author")
@@ -417,7 +417,7 @@ pub struct GrantList {
 impl GrantList {
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            complete: node.attribute("CompleteYN").map_or(false, |v| v == "Y"),
+            complete: node.attribute("CompleteYN") == Some("Y"),
             grants: node
                 .descendants()
                 .filter(|n| n.is_element() && n.tag_name().name() == "Grant")
@@ -490,7 +490,7 @@ impl Article {
                                 n2.text().or(Some("")).unwrap_or("").to_string(),
                             )),
                             "StartPage" => {} // TODO
-                            "EndPage" => {} // TODO
+                            "EndPage" => {}   // TODO
                             x => {
                                 missing_tag_warning(&format!("Not covered in Pagination: '{}'", x))
                             }
@@ -591,7 +591,7 @@ impl KeywordList {
             match n.tag_name().name() {
                 "Keyword" => {
                     ret.keywords.push(Keyword {
-                        major_topic: n.attribute("MajorTopicYN").map_or(false, |v| v == "Y"),
+                        major_topic: n.attribute("MajorTopicYN") == Some("Y"),
                         keyword: n.text().map_or("".to_string(), |v| v.to_string()),
                     });
                 }
@@ -976,7 +976,7 @@ impl Client {
         let parsing_options = ParsingOptions {
             allow_dtd: true,
             nodes_limit: u32::MAX,
-            };
+        };
         let doc = roxmltree::Document::parse_with_options(&text, parsing_options)?;
         thread::sleep(self.get_sleep_time()); // To avoid being blocked by PubMed API
         Ok(doc
