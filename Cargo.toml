@@ -13,7 +13,7 @@ include = ["**/*.rs", "Cargo.toml"]
 [dependencies]
 serde_json = "^1"
 serde = { version = "^1", features = ["derive"] }
-reqwest = { version = "*", features = ["blocking", "json"] }
-roxmltree = "*"
-rand = "*"
+reqwest = { version = "^0.12", features = ["blocking", "json"] }
+roxmltree = "^0.20"
+rand = "^0.9"
 tokio = { version = "^1", features = ["full"] }
