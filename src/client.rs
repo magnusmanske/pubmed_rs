@@ -46,7 +46,7 @@ impl Client {
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}{}",
             max, query, self.api_key_param()
         );
-        let json: serde_json::Value = reqwest::get(url.as_str()).await?.json().await?;
+        let json: serde_json::Value = reqwest::get(&url).await?.json().await?;
         match json["esearchresult"]["idlist"].as_array() {
             Some(idlist) => Ok(idlist
                 .iter()
@@ -74,7 +74,7 @@ impl Client {
             ids.join(","),
             self.api_key_param()
         );
-        let text = reqwest::get(url.as_str()).await?.text().await?;
+        let text = reqwest::get(&url).await?.text().await?;
         let parsing_options = ParsingOptions {
             allow_dtd: true,
             nodes_limit: u32::MAX,
