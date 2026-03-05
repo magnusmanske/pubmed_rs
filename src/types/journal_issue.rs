@@ -12,23 +12,25 @@ pub struct JournalIssue {
 }
 
 impl JournalIssue {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
-            cited_medium: node.attribute("CitedMedium").map(|v| v.to_string()),
+            cited_medium: node.attribute("CitedMedium").map(std::string::ToString::to_string),
             ..Default::default()
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "PubDate" => {
                     ret.pub_date = PubMedDate::new_from_xml(&n);
                 }
-                "Volume" => ret.volume = n.text().map(|v| v.to_string()),
-                "Issue" => ret.issue = n.text().map(|v| v.to_string()),
-                x => missing_tag_warning(&format!("Not covered in JournalIssue: '{}'", x)),
+                "Volume" => ret.volume = n.text().map(std::string::ToString::to_string),
+                "Issue" => ret.issue = n.text().map(std::string::ToString::to_string),
+                x => missing_tag_warning(&format!("Not covered in JournalIssue: '{x}'")),
             }
         }
         ret

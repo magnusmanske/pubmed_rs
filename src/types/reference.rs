@@ -15,11 +15,11 @@ impl Reference {
             citation: None,
             article_ids: None,
         };
-        for n in node.children().filter(|v| v.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
-                "Citation" => ret.citation = n.text().map(|v| v.to_string()),
+                "Citation" => ret.citation = n.text().map(std::string::ToString::to_string),
                 "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
-                x => missing_tag_warning(&format!("Not covered in Reference: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in Reference: '{x}'")),
             }
         }
         ret

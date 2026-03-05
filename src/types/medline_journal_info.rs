@@ -11,6 +11,7 @@ pub struct MedlineJournalInfo {
 }
 
 impl MedlineJournalInfo {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
             country: None,
@@ -18,13 +19,13 @@ impl MedlineJournalInfo {
             nlm_unique_id: None,
             issn_linking: None,
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
-                "Country" => ret.country = n.text().map(|v| v.to_string()),
-                "MedlineTA" => ret.medline_ta = n.text().map(|v| v.to_string()),
-                "NlmUniqueID" => ret.nlm_unique_id = n.text().map(|v| v.to_string()),
-                "ISSNLinking" => ret.issn_linking = n.text().map(|v| v.to_string()),
-                x => missing_tag_warning(&format!("Not covered in MedlineJournalInfo: '{}'", x)),
+                "Country" => ret.country = n.text().map(std::string::ToString::to_string),
+                "MedlineTA" => ret.medline_ta = n.text().map(std::string::ToString::to_string),
+                "NlmUniqueID" => ret.nlm_unique_id = n.text().map(std::string::ToString::to_string),
+                "ISSNLinking" => ret.issn_linking = n.text().map(std::string::ToString::to_string),
+                x => missing_tag_warning(&format!("Not covered in MedlineJournalInfo: '{x}'")),
             }
         }
         ret

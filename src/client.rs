@@ -14,6 +14,7 @@ impl Client {
     /// Creates a new `Client`, optionally loading an API key from a file
     /// named `ncbi_key` in the current working directory. Whitespace is
     /// trimmed from the key.
+    #[must_use] 
     pub fn new() -> Self {
         let api_key = fs::read_to_string("ncbi_key")
             .ok()
@@ -32,7 +33,7 @@ impl Client {
 
     fn api_key_param(&self) -> String {
         match &self.api_key {
-            Some(key) => format!("&api_key={}", key),
+            Some(key) => format!("&api_key={key}"),
             None => String::new(),
         }
     }
@@ -51,15 +52,11 @@ impl Client {
             Some(idlist) => Ok(idlist
                 .iter()
                 .filter_map(|id| {
-                    id.as_str().and_then(|x| match x.parse::<u64>() {
-                        Ok(u) => Some(u),
-                        Err(_) => {
-                            eprintln!(
-                                "PubMed::article_ids_from_query: '{}' should be a numeric ID",
-                                x
-                            );
-                            None
-                        }
+                    id.as_str().and_then(|x| if let Ok(u) = x.parse::<u64>() { Some(u) } else {
+                        eprintln!(
+                            "PubMed::article_ids_from_query: '{x}' should be a numeric ID"
+                        );
+                        None
                     })
                 })
                 .collect()),
@@ -68,7 +65,7 @@ impl Client {
     }
 
     pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
-        let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
+        let ids: Vec<String> = ids.iter().map(std::string::ToString::to_string).collect();
         let url = format!(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}{}",
             ids.join(","),
@@ -100,8 +97,7 @@ impl Client {
         match self.articles(&[id]).await?.pop() {
             Some(pubmed_article) => Ok(pubmed_article),
             None => Err(From::from(format!(
-                "Can't find PubmedArticle for ID '{}'",
-                id
+                "Can't find PubmedArticle for ID '{id}'"
             ))),
         }
     }

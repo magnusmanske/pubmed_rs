@@ -21,23 +21,26 @@ impl PubMedDate {
             day: 0,
             hour: -1,
             minute: -1,
-            date_type: node.attribute("DateType").map(|v| v.to_string()),
-            pub_status: node.attribute("PubStatus").map(|v| v.to_string()),
+            date_type: node
+                .attribute("DateType")
+                .map(std::string::ToString::to_string),
+            pub_status: node
+                .attribute("PubStatus")
+                .map(std::string::ToString::to_string),
         };
 
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
-                "MedlineDate" => {} // TODO
                 "Year" => ret.year = n.text().map_or(0, |v| v.parse::<u32>().unwrap_or(0)),
                 "Month" => ret.month = Self::parse_month_from_xml(&n),
                 "Day" => ret.day = n.text().map_or(0, |v| v.parse::<u8>().unwrap_or(0)),
                 "Hour" => ret.hour = n.text().map_or(-1, |v| v.parse::<i8>().unwrap_or(-1)),
                 "Minute" => ret.minute = n.text().map_or(-1, |v| v.parse::<i8>().unwrap_or(-1)),
-                "Season" => {
+                "MedlineDate" | "Season" => {
                     // TODO
                     // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=11364263
                 }
-                x => missing_tag_warning(&format!("Not covered in PubMedDate: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in PubMedDate: '{x}'")),
             }
         }
         match ret.precision() {
@@ -68,6 +71,7 @@ impl PubMedDate {
     }
 
     // 13=minute, 12=hour, 11=day, 10=month, 9=year; same as Wikidata/wikibase
+    #[must_use]
     pub fn precision(&self) -> u8 {
         if self.year == 0 {
             0

@@ -15,12 +15,13 @@ pub struct KeywordList {
 }
 
 impl KeywordList {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
-            owner: node.attribute("Owner").map(|v| v.to_string()),
+            owner: node.attribute("Owner").map(std::string::ToString::to_string),
             keywords: vec![],
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "Keyword" => {
                     ret.keywords.push(Keyword {
@@ -28,7 +29,7 @@ impl KeywordList {
                         keyword: n.text().unwrap_or("").to_string(),
                     });
                 }
-                x => missing_tag_warning(&format!("Not covered in KeywordList: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in KeywordList: '{x}'")),
             }
         }
         ret

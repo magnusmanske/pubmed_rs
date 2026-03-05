@@ -7,10 +7,11 @@ pub struct PublicationType {
 }
 
 impl PublicationType {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            ui: node.attribute("UI").map(|v| v.to_string()),
-            name: node.text().map(|v| v.to_string()),
+            ui: node.attribute("UI").map(std::string::ToString::to_string),
+            name: node.text().map(std::string::ToString::to_string),
         }
     }
 }

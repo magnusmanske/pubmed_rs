@@ -6,6 +6,7 @@ pub struct Abstract {
 }
 
 impl Abstract {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             text: node

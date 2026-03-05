@@ -27,29 +27,32 @@ pub struct Article {
 }
 
 impl Article {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Article {
-            pub_model: node.attribute("PubModel").map(|v| v.to_string()),
+            pub_model: node
+                .attribute("PubModel")
+                .map(std::string::ToString::to_string),
             ..Default::default()
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
-                "ArticleTitle" => ret.title = n.text().map(|v| v.to_string()),
+                "ArticleTitle" => ret.title = n.text().map(std::string::ToString::to_string),
                 "Journal" => ret.journal = Some(Journal::new_from_xml(&n)),
                 "Pagination" => {
-                    for n2 in n.children().filter(|n| n.is_element()) {
+                    for n2 in n.children().filter(roxmltree::Node::is_element) {
                         match n2.tag_name().name() {
                             "MedlinePgn" => ret
                                 .pagination
                                 .push(Pagination::MedlinePgn(n2.text().unwrap_or("").to_string())),
-                            "StartPage" => {} // TODO
-                            "EndPage" => {}   // TODO
+                            "StartPage" | "EndPage" => {} // TODO
                             x => {
-                                missing_tag_warning(&format!("Not covered in Pagination: '{}'", x))
+                                missing_tag_warning(&format!("Not covered in Pagination: '{x}'"));
                             }
                         }
                     }
@@ -57,12 +60,14 @@ impl Article {
                 "ELocationID" => ret.e_location_ids.push(ELocationID::new_from_xml(&n)),
                 "Abstract" => ret.the_abstract = Some(Abstract::new_from_xml(&n)),
                 "AuthorList" => ret.author_list = Some(AuthorList::new_from_xml(&n)),
-                "Language" => ret.language = n.text().map(|v| v.to_string()),
-                "VernacularTitle" => ret.vernacular_title = n.text().map(|v| v.to_string()),
+                "Language" => ret.language = n.text().map(std::string::ToString::to_string),
+                "VernacularTitle" => {
+                    ret.vernacular_title = n.text().map(std::string::ToString::to_string)
+                }
                 "GrantList" => ret.grant_list = Some(GrantList::new_from_xml(&n)),
                 "ArticleDate" => {
                     if let Some(date) = PubMedDate::new_from_xml(&n) {
-                        ret.article_date.push(date)
+                        ret.article_date.push(date);
                     }
                 }
                 "PublicationTypeList" => {
@@ -70,13 +75,13 @@ impl Article {
                         .children()
                         .filter(|n| n.is_element() && n.tag_name().name() == "PublicationType")
                         .map(|n| PublicationType::new_from_xml(&n))
-                        .collect()
+                        .collect();
                 }
                 "DataBankList" => {
                     // TODO
                     // Example: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=2567002
                 }
-                x => missing_tag_warning(&format!("Not covered in Article: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in Article: '{x}'")),
             }
         }
         ret

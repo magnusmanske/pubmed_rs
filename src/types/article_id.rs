@@ -16,13 +16,13 @@ pub struct ArticleIdList {
 impl ArticleIdList {
     pub(crate) fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self { ids: vec![] };
-        for n in node.children().filter(|v| v.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "ArticleId" => ret.ids.push(ArticleId {
-                    id_type: n.attribute("IdType").map(|v| v.to_string()),
-                    id: n.text().map(|v| v.to_string()),
+                    id_type: n.attribute("IdType").map(std::string::ToString::to_string),
+                    id: n.text().map(std::string::ToString::to_string),
                 }),
-                x => missing_tag_warning(&format!("Not covered in ArticleIdList: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in ArticleIdList: '{x}'")),
             }
         }
         ret

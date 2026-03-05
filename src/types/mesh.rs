@@ -10,9 +10,9 @@ pub struct MeshTermPart {
 impl MeshTermPart {
     pub(crate) fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            ui: node.attribute("UI").map(|v| v.to_string()),
+            ui: node.attribute("UI").map(std::string::ToString::to_string),
             major_topic: node.attribute("MajorTopicYN") == Some("Y"),
-            name: node.text().map(|v| v.to_string()),
+            name: node.text().map(std::string::ToString::to_string),
         }
     }
 }

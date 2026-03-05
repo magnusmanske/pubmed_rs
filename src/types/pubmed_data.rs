@@ -14,6 +14,7 @@ pub struct PubmedData {
 }
 
 impl PubmedData {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
             article_ids: None,
@@ -21,42 +22,40 @@ impl PubmedData {
             references: vec![],
             publication_status: None,
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "ReferenceList" => ret.add_references_from_xml(&n),
                 "ArticleIdList" => ret.article_ids = Some(ArticleIdList::new_from_xml(&n)),
-                "PublicationStatus" => ret.publication_status = n.text().map(|v| v.to_string()),
+                "PublicationStatus" => ret.publication_status = n.text().map(std::string::ToString::to_string),
                 "History" => ret.add_history_from_xml(&n),
-                x => missing_tag_warning(&format!("Not covered in PubmedData: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in PubmedData: '{x}'")),
             }
         }
         ret
     }
 
     fn add_history_from_xml(&mut self, node: &roxmltree::Node) {
-        for n in node.children().filter(|v| v.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "PubMedPubDate" => {
                     if let Some(date) = PubMedDate::new_from_xml(&n) {
-                        self.history.push(date)
+                        self.history.push(date);
                     }
                 }
                 x => missing_tag_warning(&format!(
-                    "Not covered in PubmedData::add_history_from_xml: '{}'",
-                    x
+                    "Not covered in PubmedData::add_history_from_xml: '{x}'"
                 )),
             }
         }
     }
 
     fn add_references_from_xml(&mut self, node: &roxmltree::Node) {
-        for n in node.children().filter(|v| v.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
                 "Reference" => self.references.push(Reference::new_from_xml(&n)),
                 "Title" => {} // ReferenceList can contain a Title element; ignored
                 x => missing_tag_warning(&format!(
-                    "Not covered in PubmedData::add_references_from_xml: '{}'",
-                    x
+                    "Not covered in PubmedData::add_references_from_xml: '{x}'"
                 )),
             }
         }

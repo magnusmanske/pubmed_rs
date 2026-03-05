@@ -11,18 +11,19 @@ pub struct PubmedArticle {
 }
 
 impl PubmedArticle {
+    #[must_use] 
     pub fn new_from_xml(root: &roxmltree::Node) -> Self {
         let mut ret = Self {
             medline_citation: None,
             pubmed_data: None,
         };
-        for node in root.children().filter(|n| n.is_element()) {
+        for node in root.children().filter(roxmltree::Node::is_element) {
             match node.tag_name().name() {
                 "MedlineCitation" => {
-                    ret.medline_citation = Some(MedlineCitation::new_from_xml(&node))
+                    ret.medline_citation = Some(MedlineCitation::new_from_xml(&node));
                 }
                 "PubmedData" => ret.pubmed_data = Some(PubmedData::new_from_xml(&node)),
-                x => missing_tag_warning(&format!("Not covered in PubmedArticle: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in PubmedArticle: '{x}'")),
             }
         }
         ret

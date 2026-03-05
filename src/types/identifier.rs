@@ -7,10 +7,11 @@ pub struct Identifier {
 }
 
 impl Identifier {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            id: node.text().map(|v| v.to_string()),
-            source: node.attribute("Source").map(|v| v.to_string()),
+            id: node.text().map(std::string::ToString::to_string),
+            source: node.attribute("Source").map(std::string::ToString::to_string),
         }
     }
 }

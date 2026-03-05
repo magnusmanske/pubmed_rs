@@ -8,11 +8,12 @@ pub struct ELocationID {
 }
 
 impl ELocationID {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
-            e_id_type: node.attribute("EIdType").map(|v| v.to_string()),
+            e_id_type: node.attribute("EIdType").map(std::string::ToString::to_string),
             valid: node.attribute("ValidYN") == Some("Y"),
-            id: node.text().map(|v| v.to_string()),
+            id: node.text().map(std::string::ToString::to_string),
         }
     }
 }

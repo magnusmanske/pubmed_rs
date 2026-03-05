@@ -17,6 +17,7 @@ pub struct Author {
 }
 
 impl Author {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         let mut ret = Self {
             last_name: None,
@@ -28,16 +29,16 @@ impl Author {
             identifiers: vec![],
             valid: node.attribute("ValidYN") == Some("Y"),
         };
-        for n in node.children().filter(|n| n.is_element()) {
+        for n in node.children().filter(roxmltree::Node::is_element) {
             match n.tag_name().name() {
-                "LastName" => ret.last_name = n.text().map(|v| v.to_string()),
-                "ForeName" => ret.fore_name = n.text().map(|v| v.to_string()),
-                "CollectiveName" => ret.collective_name = n.text().map(|v| v.to_string()),
-                "Initials" => ret.initials = n.text().map(|v| v.to_string()),
-                "Suffix" => ret.suffix = n.text().map(|v| v.to_string()),
+                "LastName" => ret.last_name = n.text().map(std::string::ToString::to_string),
+                "ForeName" => ret.fore_name = n.text().map(std::string::ToString::to_string),
+                "CollectiveName" => ret.collective_name = n.text().map(std::string::ToString::to_string),
+                "Initials" => ret.initials = n.text().map(std::string::ToString::to_string),
+                "Suffix" => ret.suffix = n.text().map(std::string::ToString::to_string),
                 "Identifier" => ret.identifiers.push(Identifier::new_from_xml(&n)),
                 "AffiliationInfo" => ret.affiliation_info = Some(AffiliationInfo::new_from_xml(&n)),
-                x => missing_tag_warning(&format!("Not covered in Author: '{}'", x)),
+                x => missing_tag_warning(&format!("Not covered in Author: '{x}'")),
             }
         }
         ret
@@ -51,6 +52,7 @@ pub struct AuthorList {
 }
 
 impl AuthorList {
+    #[must_use] 
     pub fn new_from_xml(node: &roxmltree::Node) -> Self {
         Self {
             complete: node.attribute("CompleteYN") == Some("Y"),
