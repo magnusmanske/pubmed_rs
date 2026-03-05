@@ -11,9 +11,23 @@ pub struct Client {
 }
 
 impl Client {
+    /// Creates a new `Client`, optionally loading an API key from a file
+    /// named `ncbi_key` in the current working directory. Whitespace is
+    /// trimmed from the key.
     pub fn new() -> Self {
-        let api_key = fs::read_to_string("ncbi_key").ok();
+        let api_key = fs::read_to_string("ncbi_key")
+            .ok()
+            .map(|k| k.trim().to_string())
+            .filter(|k| !k.is_empty());
         Client { api_key }
+    }
+
+    /// Creates a new `Client` with an explicit API key.
+    pub fn with_api_key(api_key: impl Into<String>) -> Self {
+        let key = api_key.into();
+        Client {
+            api_key: if key.is_empty() { None } else { Some(key) },
+        }
     }
 
     pub async fn article_ids_from_query(

@@ -599,6 +599,21 @@ mod tests {
     }
 
     #[test]
+    fn test_client_with_api_key() {
+        let client = crate::Client::with_api_key("my_test_key");
+        let debug = format!("{:?}", client);
+        assert!(debug.contains("my_test_key"));
+    }
+
+    #[test]
+    fn test_client_with_empty_api_key() {
+        let client = crate::Client::with_api_key("");
+        let debug = format!("{:?}", client);
+        // Empty key should result in None
+        assert!(debug.contains("None"));
+    }
+
+    #[test]
     fn test_serde_roundtrip_pubmed_date() {
         let date = PubMedDate {
             year: 2020,
