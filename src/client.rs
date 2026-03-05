@@ -30,14 +30,21 @@ impl Client {
         }
     }
 
+    fn api_key_param(&self) -> String {
+        match &self.api_key {
+            Some(key) => format!("&api_key={}", key),
+            None => String::new(),
+        }
+    }
+
     pub async fn article_ids_from_query(
         &self,
         query: &str,
         max: u64,
     ) -> Result<Vec<u64>, Box<dyn Error>> {
         let url = format!(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",
-            max, query
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}{}",
+            max, query, self.api_key_param()
         );
         let json: serde_json::Value = reqwest::get(url.as_str()).await?.json().await?;
         match json["esearchresult"]["idlist"].as_array() {
@@ -63,8 +70,9 @@ impl Client {
     pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
         let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
         let url = format!(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}",
-            ids.join(",")
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}{}",
+            ids.join(","),
+            self.api_key_param()
         );
         let text = reqwest::get(url.as_str()).await?.text().await?;
         let parsing_options = ParsingOptions {
