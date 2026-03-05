@@ -79,6 +79,7 @@ impl Client {
         let parsing_options = ParsingOptions {
             allow_dtd: true,
             nodes_limit: u32::MAX,
+            ..Default::default()
         };
         let doc = roxmltree::Document::parse_with_options(&text, parsing_options)?;
         tokio::time::sleep(self.get_sleep_time()).await; // To avoid being blocked by PubMed API
