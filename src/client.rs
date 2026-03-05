@@ -14,7 +14,7 @@ impl Client {
     /// Creates a new `Client`, optionally loading an API key from a file
     /// named `ncbi_key` in the current working directory. Whitespace is
     /// trimmed from the key.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let api_key = fs::read_to_string("ncbi_key")
             .ok()
@@ -52,11 +52,15 @@ impl Client {
             Some(idlist) => Ok(idlist
                 .iter()
                 .filter_map(|id| {
-                    id.as_str().and_then(|x| if let Ok(u) = x.parse::<u64>() { Some(u) } else {
-                        eprintln!(
-                            "PubMed::article_ids_from_query: '{x}' should be a numeric ID"
-                        );
-                        None
+                    id.as_str().and_then(|x| {
+                        if let Ok(u) = x.parse::<u64>() {
+                            Some(u)
+                        } else {
+                            eprintln!(
+                                "PubMed::article_ids_from_query: '{x}' should be a numeric ID"
+                            );
+                            None
+                        }
                     })
                 })
                 .collect()),
@@ -87,9 +91,10 @@ impl Client {
     }
 
     fn get_sleep_time(&self) -> std::time::Duration {
-        match self.api_key {
-            Some(_) => std::time::Duration::from_millis(120), // 10/sec with api_key
-            None => std::time::Duration::from_millis(400),    // 3/sec without api key
+        if self.api_key.is_some() {
+            std::time::Duration::from_millis(120) // 10/sec with api_key
+        } else {
+            std::time::Duration::from_millis(400) // 3/sec without api key
         }
     }
 
