@@ -36,7 +36,7 @@ impl Client {
         max: u64,
     ) -> Result<Vec<u64>, Box<dyn Error>> {
         let url = format!(
-            "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}",
             max, query
         );
         let json: serde_json::Value = reqwest::get(url.as_str()).await?.json().await?;
