@@ -5,9 +5,19 @@ use std::fs;
 
 use crate::types::PubmedArticle;
 
+const DEFAULT_BASE_URL: &str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Client {
     api_key: Option<String>,
+    #[serde(skip)]
+    http_client: reqwest::Client,
+    #[serde(default = "default_base_url")]
+    base_url: String,
+}
+
+fn default_base_url() -> String {
+    DEFAULT_BASE_URL.to_string()
 }
 
 impl Client {
@@ -20,7 +30,11 @@ impl Client {
             .ok()
             .map(|k| k.trim().to_string())
             .filter(|k| !k.is_empty());
-        Client { api_key }
+        Client {
+            api_key,
+            http_client: reqwest::Client::new(),
+            base_url: default_base_url(),
+        }
     }
 
     /// Creates a new `Client` with an explicit API key.
@@ -28,7 +42,25 @@ impl Client {
         let key = api_key.into();
         Client {
             api_key: if key.is_empty() { None } else { Some(key) },
+            http_client: reqwest::Client::new(),
+            base_url: default_base_url(),
         }
+    }
+
+    /// Replaces the internal `reqwest::Client`. Useful for sharing a
+    /// connection pool, embedding middleware (retry layers, tracing,
+    /// custom user-agent), or in tests that want fast-fail timeouts.
+    /// All other configuration set so far is preserved.
+    pub fn http_client(mut self, client: reqwest::Client) -> Self {
+        self.http_client = client;
+        self
+    }
+
+    /// Overrides the API base URL. Lets tests redirect every request
+    /// to a wiremock server: `.with_base_url(mock.uri())`.
+    pub fn base_url(mut self, url: impl Into<String>) -> Self {
+        self.base_url = url.into();
+        self
     }
 
     fn api_key_param(&self) -> String {
@@ -44,10 +76,13 @@ impl Client {
         max: u64,
     ) -> Result<Vec<u64>, Box<dyn Error>> {
         let url = format!(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}{}",
-            max, query, self.api_key_param()
+            "{}/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}{}",
+            self.base_url,
+            max,
+            query,
+            self.api_key_param()
         );
-        let json: serde_json::Value = reqwest::get(&url).await?.json().await?;
+        let json: serde_json::Value = self.http_client.get(&url).send().await?.json().await?;
         match json["esearchresult"]["idlist"].as_array() {
             Some(idlist) => Ok(idlist
                 .iter()
@@ -71,11 +106,12 @@ impl Client {
     pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
         let ids: Vec<String> = ids.iter().map(std::string::ToString::to_string).collect();
         let url = format!(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={}{}",
+            "{}/efetch.fcgi?db=pubmed&retmode=xml&id={}{}",
+            self.base_url,
             ids.join(","),
             self.api_key_param()
         );
-        let text = reqwest::get(&url).await?.text().await?;
+        let text = self.http_client.get(&url).send().await?.text().await?;
         let parsing_options = ParsingOptions {
             allow_dtd: true,
             nodes_limit: u32::MAX,
