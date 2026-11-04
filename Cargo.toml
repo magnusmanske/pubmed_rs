@@ -1,6 +1,6 @@
 [package]
 name = "pubmed"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Magnus Manske <magnusmanske@googlemail.com>"]
 edition = "2021"
 description = "A wrapper around the PubMed API"
@@ -17,3 +17,4 @@ reqwest = { version = "^0.13", features = ["json"] }
 roxmltree = "^0.21"
 tokio = { version = "^1", features = ["full"] }
 rand = "^0.10"
+thiserror = "^2"

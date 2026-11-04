@@ -1,9 +1,11 @@
 pub mod client;
+pub mod error;
 pub mod helpers;
 pub mod types;
 
 // Re-export all public types at the crate root for backwards compatibility
 pub use client::Client;
+pub use error::{PubMedError, Result};
 pub use types::*;
 
 #[cfg(test)]

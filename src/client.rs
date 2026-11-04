@@ -1,8 +1,8 @@
 use roxmltree::ParsingOptions;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::fs;
 
+use crate::error::{PubMedError, Result};
 use crate::types::PubmedArticle;
 
 const DEFAULT_BASE_URL: &str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
@@ -70,11 +70,7 @@ impl Client {
         }
     }
 
-    pub async fn article_ids_from_query(
-        &self,
-        query: &str,
-        max: u64,
-    ) -> Result<Vec<u64>, Box<dyn Error>> {
+    pub async fn article_ids_from_query(&self, query: &str, max: u64) -> Result<Vec<u64>> {
         let url = format!(
             "{}/esearch.fcgi?db=pubmed&retmode=json&retmax={}&term={}{}",
             self.base_url,
@@ -99,11 +95,11 @@ impl Client {
                     })
                 })
                 .collect()),
-            None => Err(From::from("API error/no results")),
+            None => Err(PubMedError::NoResults),
         }
     }
 
-    pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>, Box<dyn Error>> {
+    pub async fn articles(&self, ids: &[u64]) -> Result<Vec<PubmedArticle>> {
         let ids: Vec<String> = ids.iter().map(std::string::ToString::to_string).collect();
         let url = format!(
             "{}/efetch.fcgi?db=pubmed&retmode=xml&id={}{}",
@@ -135,12 +131,10 @@ impl Client {
         }
     }
 
-    pub async fn article(&self, id: u64) -> Result<PubmedArticle, Box<dyn Error>> {
+    pub async fn article(&self, id: u64) -> Result<PubmedArticle> {
         match self.articles(&[id]).await?.pop() {
             Some(pubmed_article) => Ok(pubmed_article),
-            None => Err(From::from(format!(
-                "Can't find PubmedArticle for ID '{id}'"
-            ))),
+            None => Err(PubMedError::ArticleNotFound(id)),
         }
     }
 }

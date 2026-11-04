@@ -747,13 +747,14 @@ dependencies = [
 
 [[package]]
 name = "pubmed"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "rand",
  "reqwest",
  "roxmltree",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
 ]
 
